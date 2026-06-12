@@ -86,8 +86,8 @@ export function FreteCard({ frete, onClick }: FreteCardProps) {
 
 
         {showCteBadge && frete.chave_cte && (
-          <p className="text-[10px] font-mono text-muted-foreground break-all leading-tight">
-            {frete.chave_cte}
+          <p className="text-[9px] font-mono text-muted-foreground leading-tight whitespace-normal break-all">
+            {frete.chave_cte.replace(/(.{11})/g, '$1 ').trim()}
           </p>
         )}
       </CardContent>
