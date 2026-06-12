@@ -146,7 +146,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Kanban */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
         <KanbanBoard onCardClick={setFreteDetalhe} />
       </div>
 

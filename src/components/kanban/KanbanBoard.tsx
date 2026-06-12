@@ -68,7 +68,7 @@ export function KanbanBoard({ onCardClick }: KanbanBoardProps) {
   )
 
   return (
-    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 h-full">
+    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 min-h-full">
       {COLUNAS_KANBAN.map((status) => (
         <KanbanColumn
           key={status}
