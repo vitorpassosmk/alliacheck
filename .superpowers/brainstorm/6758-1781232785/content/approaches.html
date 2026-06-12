@@ -1,0 +1,46 @@
+<h2>Como reestruturar o fluxo do frete?</h2>
+<p class="subtitle">3 abordagens para implementar o novo pipeline de estados</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Refatoração limpa <span style="font-size:0.75rem;background:#22c55e;color:white;padding:2px 8px;border-radius:99px;margin-left:8px;">Recomendado</span></h3>
+      <p>Substituir os estados CT-e (<code>AGUARDANDO_NF</code>, <code>NF_RECEBIDA</code>, <code>CT_E_EMITIDO</code>) por novos estados na <strong>viagem principal</strong>: <code>AGUARDANDO_CTE</code> e <code>CTE_EMITIDO</code>. Remover completamente o campo <code>cte_status</code> do banco. O número do CT-e (44 dígitos) fica salvo diretamente na tabela <code>fretes</code>. Remover upload de NF-e, checklist de 6 itens e toda a aba de documentos.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Prós</h4><ul><li>Código limpo, sem estados mortos</li><li>Fluxo único e sem ambiguidade</li><li>Kanban reflete exatamente a realidade</li><li>Menos superfície de bug</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Migration no banco necessária</li><li>Maior escopo de mudança</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Abordagem híbrida (manter cte_status)</h3>
+      <p>Manter <code>cte_status</code> como campo auxiliar, mas esconder da UI. Adicionar os novos estados de viagem por cima. O estado <code>AGUARDANDO_CTE</code> na viagem seria sincronizado com <code>cte_status</code> internamente.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Prós</h4><ul><li>Menos risco de quebrar algo existente</li><li>Reversível mais facilmente</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Dois sistemas de estado paralelos — confuso</li><li>Lógica duplicada no backend</li><li>Deixa código morto no projeto</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Feature flag / modo simplificado</h3>
+      <p>Criar um toggle por cliente que ativa o "modo simplificado" (sem NF-e, sem checklist). Os dois fluxos coexistem no código, ativados por configuração do tenant.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Prós</h4><ul><li>Flexível para outros clientes futuros</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Complexidade prematura — só há um cliente agora</li><li>Dobra o código de fluxo a manter</li><li>YAGNI — não há requisito multi-fluxo hoje</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px;padding:16px;background:rgba(99,102,241,0.08);border-radius:12px;border:1px solid rgba(99,102,241,0.2)">
+  <p style="margin:0;font-size:0.9rem"><strong>Recomendação:</strong> Opção A — refatoração limpa. O projeto ainda está em fase pré-demo, o banco ainda não está em produção com dados reais, e código limpo vai facilitar tudo daqui pra frente. A Opção B deixa dívida técnica desde o início; a C é prematura.</p>
+</div>

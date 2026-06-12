@@ -1,0 +1,105 @@
+<h2>Fluxo de estados — revisado</h2>
+<p class="subtitle">6 estados — motorista, veículo e data são obrigatórios na criação</p>
+
+<div style="margin: 24px 0;">
+  <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;">
+
+    <div style="text-align:center;">
+      <div style="background:#3b82f6;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">ABERTO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Criado com motorista + veículo + data</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#f59e0b;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">CARREGANDO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Caminhão em carregamento</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#f97316;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:110px;">AGUARDANDO_CTE</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Aguardando emissão (externo)</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#06b6d4;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">CTE_EMITIDO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Funcionário registra nº CT-e</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#22c55e;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">EM_VIAGEM</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Caminhão liberado</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#16a34a;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">FINALIZADO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Entrega concluída</div>
+    </div>
+
+  </div>
+
+  <div style="text-align:center;margin-top:12px;">
+    <span style="font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.08);padding:4px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.2)">
+      ↕ CANCELADO — permitido em qualquer estado (exceto FINALIZADO)
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Regras de transição</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+    <thead>
+      <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+        <th style="text-align:left;padding:8px 12px;">De</th>
+        <th style="text-align:left;padding:8px 12px;">Para</th>
+        <th style="text-align:left;padding:8px 12px;">Pré-requisito</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;"><em>Criação</em></td>
+        <td style="padding:8px 12px;">ABERTO</td>
+        <td style="padding:8px 12px;">motorista_id + veiculo_id + data_carregamento <strong>(obrigatórios)</strong></td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">ABERTO</td>
+        <td style="padding:8px 12px;">CARREGANDO</td>
+        <td style="padding:8px 12px;">— (nenhum, dados já estão no frete)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">CARREGANDO</td>
+        <td style="padding:8px 12px;">AGUARDANDO_CTE</td>
+        <td style="padding:8px 12px;">— (nenhum)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">AGUARDANDO_CTE</td>
+        <td style="padding:8px 12px;">CTE_EMITIDO</td>
+        <td style="padding:8px 12px;">chave CT-e válida (44 dígitos, módulo 11)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">CTE_EMITIDO</td>
+        <td style="padding:8px 12px;">EM_VIAGEM</td>
+        <td style="padding:8px 12px;">— (CT-e já validado na etapa anterior)</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;">EM_VIAGEM</td>
+        <td style="padding:8px 12px;">FINALIZADO</td>
+        <td style="padding:8px 12px;">— (nenhum)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>O que muda vs. versão anterior</h3>
+  <ul style="font-size:0.88rem;line-height:1.8;">
+    <li>Estado <code>PROGRAMADO</code> removido do pipeline</li>
+    <li>Formulário de criação do frete passa a exigir motorista, veículo e data_carregamento</li>
+    <li>Validação que antes era na transição ABERTO→PROGRAMADO vai para o POST de criação</li>
+  </ul>
+</div>
+
+<p style="margin-top:20px;font-size:0.9rem;color:#a0a0a0;">Esse fluxo está correto? Posso avançar para o design do kanban e dos cards.</p>

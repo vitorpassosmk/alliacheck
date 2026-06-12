@@ -1,0 +1,123 @@
+<h2>Novo fluxo de estados da viagem</h2>
+<p class="subtitle">7 estados lineares — sem status secundário de CT-e</p>
+
+<div style="margin: 24px 0;">
+  <!-- Flow diagram -->
+  <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;">
+
+    <div style="text-align:center;">
+      <div style="background:#3b82f6;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">ABERTO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Frete criado</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#8b5cf6;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">PROGRAMADO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Motorista + veículo + data</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#f59e0b;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">CARREGANDO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Caminhão em carregamento</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#f97316;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:110px;">AGUARDANDO_CTE</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Aguardando emissão (externo)</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#06b6d4;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">CTE_EMITIDO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Funcionário registra nº CT-e</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#22c55e;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">EM_VIAGEM</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Caminhão liberado</div>
+    </div>
+    <div style="font-size:1.4rem;color:#666;padding:0 8px;margin-bottom:18px;">→</div>
+
+    <div style="text-align:center;">
+      <div style="background:#16a34a;color:white;padding:10px 16px;border-radius:10px;font-size:0.85rem;font-weight:600;min-width:100px;">FINALIZADO</div>
+      <div style="font-size:0.7rem;color:#888;margin-top:4px;">Entrega concluída</div>
+    </div>
+
+  </div>
+
+  <!-- Cancel arrow -->
+  <div style="text-align:center;margin-top:12px;">
+    <span style="font-size:0.8rem;color:#ef4444;background:rgba(239,68,68,0.08);padding:4px 12px;border-radius:99px;border:1px solid rgba(239,68,68,0.2)">
+      ↕ CANCELADO — permitido em qualquer estado (exceto FINALIZADO)
+    </span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Regras de transição</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+    <thead>
+      <tr style="border-bottom:2px solid rgba(255,255,255,0.1);">
+        <th style="text-align:left;padding:8px 12px;">De</th>
+        <th style="text-align:left;padding:8px 12px;">Para</th>
+        <th style="text-align:left;padding:8px 12px;">Pré-requisito</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">ABERTO</td>
+        <td style="padding:8px 12px;">PROGRAMADO</td>
+        <td style="padding:8px 12px;">motorista_id + veiculo_id + data_carregamento</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">PROGRAMADO</td>
+        <td style="padding:8px 12px;">CARREGANDO</td>
+        <td style="padding:8px 12px;">— (nenhum)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">CARREGANDO</td>
+        <td style="padding:8px 12px;">AGUARDANDO_CTE</td>
+        <td style="padding:8px 12px;">— (nenhum)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">AGUARDANDO_CTE</td>
+        <td style="padding:8px 12px;">CTE_EMITIDO</td>
+        <td style="padding:8px 12px;">chave CT-e válida (44 dígitos, módulo 11)</td>
+      </tr>
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <td style="padding:8px 12px;">CTE_EMITIDO</td>
+        <td style="padding:8px 12px;">EM_VIAGEM</td>
+        <td style="padding:8px 12px;">— (nenhum, CT-e já foi validado na etapa anterior)</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 12px;">EM_VIAGEM</td>
+        <td style="padding:8px 12px;">FINALIZADO</td>
+        <td style="padding:8px 12px;">— (nenhum)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h3>O que é removido</h3>
+  <ul style="font-size:0.88rem;line-height:1.8;">
+    <li>Campo <code>cte_status</code> da tabela <code>fretes</code> (e enum inteiro do banco)</li>
+    <li>Checklist de 6 itens (<code>ConferenceChecklist</code>, <code>checklist-items.ts</code>, rota <code>/api/fretes/[id]/checklist</code>)</li>
+    <li>Upload e listagem de NF-e (<code>DocumentUpload</code>, <code>DocumentList</code>, rota <code>/api/documentos</code>)</li>
+    <li>Rota <code>/api/fretes/[id]/cte</code> (substituída pela transição de status normal)</li>
+    <li>Aba "Documentos" e aba "Checklist" no <code>FreteDetailModal</code></li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>O que é adicionado ao banco</h3>
+  <ul style="font-size:0.88rem;line-height:1.8;">
+    <li>Coluna <code>chave_cte</code> (char 44, nullable) na tabela <code>fretes</code></li>
+    <li>Dois novos valores no enum <code>viagem_status</code>: <code>AGUARDANDO_CTE</code> e <code>CTE_EMITIDO</code></li>
+  </ul>
+</div>
+
+<p style="margin-top:20px;font-size:0.9rem;color:#a0a0a0;">Esse fluxo está correto? Alguma transição que falta ou regra diferente?</p>
