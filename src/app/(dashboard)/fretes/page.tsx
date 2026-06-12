@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useFretes } from '@/hooks/use-fretes'
 import { FreteDetailModal } from '@/components/fretes/FreteDetailModal'
 import { FreteFormModal } from '@/components/fretes/FreteFormModal'
-import { StatusBadge, CTEStatusBadge } from '@/components/kanban/StatusBadge'
+import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,8 +19,9 @@ type StatusViagem = Tables<'fretes'>['status'] | 'TODOS'
 const STATUS_OPTIONS: { value: StatusViagem; label: string }[] = [
   { value: 'TODOS', label: 'Todos os status' },
   { value: 'ABERTO', label: 'Aberto' },
-  { value: 'PROGRAMADO', label: 'Programado' },
   { value: 'CARREGANDO', label: 'Carregando' },
+  { value: 'AGUARDANDO_CTE', label: 'Aguard. CT-e' },
+  { value: 'CTE_EMITIDO', label: 'CT-e Emitido' },
   { value: 'EM_VIAGEM', label: 'Em Viagem' },
   { value: 'FINALIZADO', label: 'Finalizado' },
   { value: 'CANCELADO', label: 'Cancelado' },
@@ -169,8 +170,8 @@ export default function FretesPage() {
                   <TableCell>
                     <StatusBadge status={frete.status} />
                   </TableCell>
-                  <TableCell>
-                    <CTEStatusBadge status={frete.cte_status} />
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {frete.chave_cte ? frete.chave_cte.slice(-8) : '—'}
                   </TableCell>
                   <TableCell>{formatDate(frete.data_carregamento)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">

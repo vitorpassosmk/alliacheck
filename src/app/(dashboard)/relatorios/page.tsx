@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useClientes } from '@/hooks/use-clientes'
-import { StatusBadge, CTEStatusBadge } from '@/components/kanban/StatusBadge'
+import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,7 +37,7 @@ function formatDate(dateStr: string | null) {
 }
 
 function exportCsv(fretes: FreteComRelacoes[]) {
-  const headers = ['ID', 'Cliente', 'Origem', 'Destino', 'Motorista', 'Placa', 'Status', 'CT-e', 'Carregamento', 'Valor']
+  const headers = ['ID', 'Cliente', 'Origem', 'Destino', 'Motorista', 'Placa', 'Status', 'Chave CT-e', 'Carregamento', 'Valor']
   const rows = fretes.map((f) => [
     f.id.slice(-6).toUpperCase(),
     f.clientes?.razao_social ?? '',
@@ -46,7 +46,7 @@ function exportCsv(fretes: FreteComRelacoes[]) {
     f.motoristas?.nome ?? '',
     f.veiculos?.placa ?? '',
     f.status,
-    f.cte_status,
+    f.chave_cte ?? '',
     f.data_carregamento ?? '',
     f.valor_frete?.toString() ?? '',
   ])
@@ -136,8 +136,9 @@ export default function RelatoriosPage() {
               <SelectContent>
                 <SelectItem value="">Todos</SelectItem>
                 <SelectItem value="ABERTO">Aberto</SelectItem>
-                <SelectItem value="PROGRAMADO">Programado</SelectItem>
                 <SelectItem value="CARREGANDO">Carregando</SelectItem>
+                <SelectItem value="AGUARDANDO_CTE">Aguard. CT-e</SelectItem>
+                <SelectItem value="CTE_EMITIDO">CT-e Emitido</SelectItem>
                 <SelectItem value="EM_VIAGEM">Em Viagem</SelectItem>
                 <SelectItem value="FINALIZADO">Finalizado</SelectItem>
                 <SelectItem value="CANCELADO">Cancelado</SelectItem>
@@ -246,7 +247,7 @@ export default function RelatoriosPage() {
                   </TableCell>
                   <TableCell>{frete.motoristas?.nome ?? '—'}</TableCell>
                   <TableCell><StatusBadge status={frete.status} /></TableCell>
-                  <TableCell><CTEStatusBadge status={frete.cte_status} /></TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{frete.chave_cte ? frete.chave_cte.slice(-8) : '—'}</TableCell>
                   <TableCell>{formatDate(frete.data_carregamento)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {frete.valor_frete ? formatCurrency(frete.valor_frete) : '—'}

@@ -84,11 +84,6 @@ export function FreteCard({ frete, onClick }: FreteCardProps) {
           <p className="text-xs text-muted-foreground">—</p>
         )}
 
-        {frete.tipo_carga && (
-          <Badge variant="outline" className="text-xs bg-[#F3E8FF] text-[#7C3AED] border-[#7C3AED]/20">
-            {frete.tipo_carga}
-          </Badge>
-        )}
 
         {showCteBadge && frete.chave_cte && (
           <p className="text-[10px] font-mono text-muted-foreground break-all leading-tight">

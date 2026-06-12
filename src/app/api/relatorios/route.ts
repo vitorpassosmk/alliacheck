@@ -10,8 +10,6 @@ export async function GET(request: Request) {
   const dataFim = url.searchParams.get('data_fim')
   const clienteId = url.searchParams.get('cliente_id')
   const statusViagem = url.searchParams.get('status')
-  const statusCte = url.searchParams.get('cte_status')
-
   let query = supabase
     .from('fretes')
     .select(`*, clientes(razao_social), motoristas(nome), veiculos(placa, tipo)`)
@@ -24,8 +22,8 @@ export async function GET(request: Request) {
     query = query.lte('criado_em', fim.toISOString())
   }
   if (clienteId) query = query.eq('cliente_id', clienteId)
-  if (statusViagem) query = query.eq('status', statusViagem as 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO')
-  if (statusCte) query = query.eq('cte_status', statusCte as 'PENDENTE' | 'AGUARDANDO_NF' | 'NF_RECEBIDA' | 'CT_E_EMITIDO' | 'CT_E_CANCELADO')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (statusViagem) query = query.eq('status', statusViagem as any)
 
   const { data: fretes, error } = await query
   if (error) return Response.json({ error: error.message }, { status: 500 })
@@ -34,7 +32,7 @@ export async function GET(request: Request) {
   const finalizados = fretes.filter((f) => f.status === 'FINALIZADO').length
   const cancelados = fretes.filter((f) => f.status === 'CANCELADO').length
   const emAndamento = fretes.filter((f) =>
-    ['ABERTO', 'PROGRAMADO', 'CARREGANDO', 'EM_VIAGEM'].includes(f.status)
+    ['ABERTO', 'CARREGANDO', 'AGUARDANDO_CTE', 'CTE_EMITIDO', 'EM_VIAGEM'].includes(f.status)
   ).length
   const valorTotal = fretes.reduce((acc, f) => acc + (f.valor_frete ?? 0), 0)
   const porStatus = fretes.reduce(

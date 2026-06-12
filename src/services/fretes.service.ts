@@ -1,4 +1,4 @@
-import type { Tables, TablesInsert, TablesUpdate } from '@/types/database.types'
+import type { Tables } from '@/types/database.types'
 
 export type FreteComRelacoes = Tables<'fretes'> & {
   clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
@@ -64,13 +64,4 @@ export const fretesService = {
       body: JSON.stringify(payload),
     }).then((r) => handleResponse(r)),
 
-  atualizarCte: (
-    id: string,
-    payload: { cte_status: Tables<'fretes'>['cte_status'] }
-  ): Promise<Tables<'fretes'>> =>
-    fetch(`/api/fretes/${id}/cte`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).then((r) => handleResponse(r)),
 }
