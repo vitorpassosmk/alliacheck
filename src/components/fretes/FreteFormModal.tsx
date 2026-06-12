@@ -22,11 +22,11 @@ const FreteSchema = z.object({
   destino_cidade: z.string().min(1, 'Obrigatório'),
   destino_uf: z.string().length(2, 'UF inválida'),
   cliente_id: z.string().uuid().nullable().optional(),
-  motorista_id: z.string().uuid().nullable().optional(),
-  veiculo_id: z.string().uuid().nullable().optional(),
+  motorista_id: z.string().uuid('Selecione o motorista'),
+  veiculo_id: z.string().uuid('Selecione o veículo'),
   tipo_veiculo: z.string().nullable().optional(),
   valor_frete: z.string().optional(),
-  data_carregamento: z.string().nullable().optional(),
+  data_carregamento: z.string().min(1, 'Obrigatório'),
   data_entrega_prevista: z.string().nullable().optional(),
   observacoes: z.string().nullable().optional(),
 })
@@ -68,14 +68,14 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
       origem_uf: '',
       destino_cidade: '',
       destino_uf: '',
-      cliente_id: null,
-      motorista_id: null,
-      veiculo_id: null,
-      tipo_veiculo: null,
+      cliente_id: undefined,
+      motorista_id: '',
+      veiculo_id: '',
+      tipo_veiculo: undefined,
       valor_frete: '',
-      data_carregamento: null,
-      data_entrega_prevista: null,
-      observacoes: null,
+      data_carregamento: '',
+      data_entrega_prevista: undefined,
+      observacoes: undefined,
     },
   })
 
@@ -182,7 +182,7 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="motorista_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Motorista</FormLabel>
+                  <FormLabel>Motorista *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                     <SelectContent>
@@ -196,7 +196,7 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
               )} />
               <FormField control={form.control} name="veiculo_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Veículo</FormLabel>
+                  <FormLabel>Veículo *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                     <SelectContent>
@@ -214,7 +214,7 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="data_carregamento" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data Carregamento</FormLabel>
+                  <FormLabel>Data Carregamento *</FormLabel>
                   <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
