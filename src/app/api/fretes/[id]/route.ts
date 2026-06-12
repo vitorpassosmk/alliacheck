@@ -37,8 +37,7 @@ export async function GET(
       clientes(*),
       motoristas(*),
       veiculos(*),
-      documentos(*),
-      eventos(* )
+      eventos(*)
     `)
     .eq('id', id)
     .order('criado_em', { referencedTable: 'eventos', ascending: true })

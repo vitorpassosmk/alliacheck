@@ -1,9 +1,9 @@
 -- Seed de demonstração para o ALLiA Check — Madiã Transportes
 -- Execute apenas em ambiente de desenvolvimento/demo
+-- Atualizado para o pipeline simplificado: ABERTO → CARREGANDO → AGUARDANDO_CTE → CTE_EMITIDO → EM_VIAGEM → FINALIZADO
 
 -- Limpar dados existentes (ordem respeitando FKs)
 DELETE FROM eventos;
-DELETE FROM documentos;
 DELETE FROM fretes;
 DELETE FROM motoristas;
 DELETE FROM veiculos;
@@ -31,149 +31,171 @@ INSERT INTO motoristas (id, nome, cpf, cnh, categoria_cnh, validade_cnh, rntrc, 
 -- VEÍCULOS
 -- =====================
 INSERT INTO veiculos (id, placa, tipo, modelo, ano, proprietario, rntrc) VALUES
-  ('c3000000-0000-0000-0000-000000000001', 'BRZ-1A23', 'CARRETA',  'Scania R450',      2021, 'Madiã Transportes', '78901-2'),
-  ('c3000000-0000-0000-0000-000000000002', 'CDX-4B56', 'TRUCK',    'Mercedes-Benz 2546', 2020, 'Madiã Transportes', '89012-3'),
-  ('c3000000-0000-0000-0000-000000000003', 'EFG-7C89', 'TOCO',     'Volkswagen Delivery', 2022, 'Madiã Transportes', '90123-4'),
-  ('c4000000-0000-0000-0000-000000000004', 'HIJ-0D12', 'BITRUCK',  'Iveco Trakker 420', 2019, 'Madiã Transportes', NULL);
+  ('c3000000-0000-0000-0000-000000000001', 'BRZ-1A23', 'CARRETA',  'Scania R450',           2021, 'Madiã Transportes', '78901-2'),
+  ('c3000000-0000-0000-0000-000000000002', 'CDX-4B56', 'TRUCK',    'Mercedes-Benz 2546',    2020, 'Madiã Transportes', '89012-3'),
+  ('c3000000-0000-0000-0000-000000000003', 'EFG-7C89', 'TOCO',     'Volkswagen Delivery',   2022, 'Madiã Transportes', '90123-4'),
+  ('c4000000-0000-0000-0000-000000000004', 'HIJ-0D12', 'BITRUCK',  'Iveco Trakker 420',     2019, 'Madiã Transportes', NULL);
 
 -- =====================
--- FRETES (vários estados)
+-- FRETES (cobrindo todos os estados do novo pipeline)
 -- =====================
 
--- 1. ABERTO — aguardando programação
-INSERT INTO fretes (id, cliente_id, status, cte_status, origem_cidade, origem_uf, destino_cidade, destino_uf, valor_frete, criado_em, atualizado_em)
+-- 1. ABERTO — aguardando atribuição
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status,
+  origem_cidade, origem_uf, destino_cidade, destino_uf, valor_frete,
+  data_carregamento, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000001',
-  'a1000000-0000-0000-0000-000000000001', 'ABERTO', 'PENDENTE',
+  'a1000000-0000-0000-0000-000000000001',
+  'b2000000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'ABERTO',
   'São Paulo', 'SP', 'Campinas', 'SP', 1800.00,
+  (NOW() + INTERVAL '1 day')::date,
   NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day');
 
--- 2. ABERTO — sem cliente
-INSERT INTO fretes (id, status, cte_status, origem_cidade, origem_uf, destino_cidade, destino_uf, criado_em, atualizado_em)
+-- 2. ABERTO — sem cliente (frete spot)
+INSERT INTO fretes (id, motorista_id, veiculo_id, status,
+  origem_cidade, origem_uf, destino_cidade, destino_uf,
+  data_carregamento, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000002',
-  'ABERTO', 'PENDENTE',
+  'b2000000-0000-0000-0000-000000000002',
+  'c3000000-0000-0000-0000-000000000002',
+  'ABERTO',
   'Ribeirão Preto', 'SP', 'Franca', 'SP',
+  NOW()::date,
   NOW() - INTERVAL '2 hours', NOW() - INTERVAL '2 hours');
 
--- 3. PROGRAMADO — com motorista, veículo e data
-INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, cte_status,
+-- 3. CARREGANDO — veículo no pátio sendo carregado
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status,
   origem_cidade, origem_uf, destino_cidade, destino_uf,
   tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000003',
   'a1000000-0000-0000-0000-000000000002',
-  'b2000000-0000-0000-0000-000000000001',
-  'c3000000-0000-0000-0000-000000000001',
-  'PROGRAMADO', 'AGUARDANDO_NF',
+  'b2000000-0000-0000-0000-000000000003',
+  'c3000000-0000-0000-0000-000000000003',
+  'CARREGANDO',
   'Campinas', 'SP', 'Santos', 'SP',
-  'CARRETA', 4500.00,
-  (NOW() + INTERVAL '1 day')::date,
-  (NOW() + INTERVAL '3 days')::date,
-  NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day');
+  'TOCO', 4500.00,
+  NOW()::date,
+  (NOW() + INTERVAL '2 days')::date,
+  NOW() - INTERVAL '2 days', NOW() - INTERVAL '30 minutes');
 
--- 4. CARREGANDO
-INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, cte_status,
+-- 4. AGUARDANDO_CTE — carregamento concluído, aguardando emissão do CT-e
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status,
   origem_cidade, origem_uf, destino_cidade, destino_uf,
-  tipo_veiculo, valor_frete, data_carregamento, criado_em, atualizado_em)
+  tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000004',
   'a1000000-0000-0000-0000-000000000003',
-  'b2000000-0000-0000-0000-000000000002',
+  'b2000000-0000-0000-0000-000000000004',
   'c3000000-0000-0000-0000-000000000002',
-  'CARREGANDO', 'NF_RECEBIDA',
+  'AGUARDANDO_CTE',
   'Ribeirão Preto', 'SP', 'São Paulo', 'SP',
-  'TRUCK', 2800.00, NOW()::date,
-  NOW() - INTERVAL '3 days', NOW() - INTERVAL '30 minutes');
+  'TRUCK', 2800.00,
+  (NOW() - INTERVAL '1 day')::date,
+  NOW()::date,
+  NOW() - INTERVAL '3 days', NOW() - INTERVAL '2 hours');
 
--- 5. EM_VIAGEM
-INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, cte_status,
+-- 5. CTE_EMITIDO — CT-e registrado, aguardando saída
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, chave_cte,
   origem_cidade, origem_uf, destino_cidade, destino_uf,
   tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000005',
   'a1000000-0000-0000-0000-000000000001',
-  'b2000000-0000-0000-0000-000000000003',
-  'c3000000-0000-0000-0000-000000000003',
-  'EM_VIAGEM', 'CT_E_EMITIDO',
-  'São Paulo', 'SP', 'Belo Horizonte', 'MG',
-  'TOCO', 3200.00,
-  (NOW() - INTERVAL '1 day')::date,
-  NOW()::date,
-  NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 hours');
-
--- 6. FINALIZADO — completo
-INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, cte_status,
-  origem_cidade, origem_uf, destino_cidade, destino_uf,
-  tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, data_entrega_real, criado_em, atualizado_em)
-VALUES ('f0000000-0000-0000-0000-000000000006',
-  'a1000000-0000-0000-0000-000000000002',
-  'b2000000-0000-0000-0000-000000000004',
-  'c4000000-0000-0000-0000-000000000004',
-  'FINALIZADO', 'CT_E_EMITIDO',
-  'Campinas', 'SP', 'Rio de Janeiro', 'RJ',
-  'BITRUCK', 5100.00,
-  (NOW() - INTERVAL '5 days')::date,
-  (NOW() - INTERVAL '3 days')::date,
-  (NOW() - INTERVAL '3 days')::date,
-  NOW() - INTERVAL '7 days', NOW() - INTERVAL '3 days');
-
--- 7. FINALIZADO — segundo
-INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, cte_status,
-  origem_cidade, origem_uf, destino_cidade, destino_uf,
-  tipo_veiculo, valor_frete, data_carregamento, data_entrega_real, criado_em, atualizado_em)
-VALUES ('f0000000-0000-0000-0000-000000000007',
-  'a1000000-0000-0000-0000-000000000003',
   'b2000000-0000-0000-0000-000000000001',
   'c3000000-0000-0000-0000-000000000001',
-  'FINALIZADO', 'CT_E_EMITIDO',
+  'CTE_EMITIDO', '35240612345678000195570010000012341234567890',
+  'São Paulo', 'SP', 'Belo Horizonte', 'MG',
+  'CARRETA', 6200.00,
+  (NOW() - INTERVAL '1 day')::date,
+  (NOW() + INTERVAL '1 day')::date,
+  NOW() - INTERVAL '4 days', NOW() - INTERVAL '1 hour');
+
+-- 6. EM_VIAGEM — veículo em trânsito
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, chave_cte,
+  origem_cidade, origem_uf, destino_cidade, destino_uf,
+  tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, criado_em, atualizado_em)
+VALUES ('f0000000-0000-0000-0000-000000000006',
+  'a1000000-0000-0000-0000-000000000002',
+  'b2000000-0000-0000-0000-000000000002',
+  'c4000000-0000-0000-0000-000000000004',
+  'EM_VIAGEM', '35240698765432000196570010000056785678901234',
+  'Campinas', 'SP', 'Rio de Janeiro', 'RJ',
+  'BITRUCK', 5100.00,
+  (NOW() - INTERVAL '2 days')::date,
+  NOW()::date,
+  NOW() - INTERVAL '5 days', NOW() - INTERVAL '4 hours');
+
+-- 7. FINALIZADO — entrega concluída
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status, chave_cte,
+  origem_cidade, origem_uf, destino_cidade, destino_uf,
+  tipo_veiculo, valor_frete, data_carregamento, data_entrega_prevista, data_entrega_real, criado_em, atualizado_em)
+VALUES ('f0000000-0000-0000-0000-000000000007',
+  'a1000000-0000-0000-0000-000000000003',
+  'b2000000-0000-0000-0000-000000000003',
+  'c3000000-0000-0000-0000-000000000001',
+  'FINALIZADO', '35240611122233000144570010000078907890123456',
   'São Paulo', 'SP', 'Curitiba', 'PR',
   'CARRETA', 6800.00,
   (NOW() - INTERVAL '10 days')::date,
   (NOW() - INTERVAL '8 days')::date,
+  (NOW() - INTERVAL '8 days')::date,
   NOW() - INTERVAL '12 days', NOW() - INTERVAL '8 days');
 
 -- 8. CANCELADO
-INSERT INTO fretes (id, cliente_id, status, cte_status, origem_cidade, origem_uf, destino_cidade, destino_uf,
-  observacoes, criado_em, atualizado_em)
+INSERT INTO fretes (id, cliente_id, motorista_id, veiculo_id, status,
+  origem_cidade, origem_uf, destino_cidade, destino_uf,
+  observacoes, data_carregamento, criado_em, atualizado_em)
 VALUES ('f0000000-0000-0000-0000-000000000008',
   'a1000000-0000-0000-0000-000000000001',
-  'CANCELADO', 'PENDENTE',
+  'b2000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000003',
+  'CANCELADO',
   'São Paulo', 'SP', 'Manaus', 'AM',
   'Cancelado: cliente solicitou cancelamento por mudança na demanda.',
+  (NOW() - INTERVAL '7 days')::date,
   NOW() - INTERVAL '8 days', NOW() - INTERVAL '7 days');
 
 -- =====================
 -- EVENTOS DE AUDITORIA
 -- =====================
-INSERT INTO eventos (frete_id, tipo, descricao, status_novo, criado_em) VALUES
+INSERT INTO eventos (frete_id, tipo, descricao, status_anterior, status_novo, criado_em) VALUES
+
   -- Frete 1 (ABERTO)
-  ('f0000000-0000-0000-0000-000000000001', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '1 day'),
+  ('f0000000-0000-0000-0000-000000000001', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO', NOW() - INTERVAL '1 day'),
 
-  -- Frete 3 (PROGRAMADO)
-  ('f0000000-0000-0000-0000-000000000003', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '2 days'),
-  ('f0000000-0000-0000-0000-000000000003', 'STATUS_ALTERADO', 'Frete programado com motorista e veículo', 'PROGRAMADO', NOW() - INTERVAL '1 day'),
-  ('f0000000-0000-0000-0000-000000000003', 'CTE_STATUS_ALTERADO', 'Aguardando recebimento da NF-e', 'AGUARDANDO_NF', NOW() - INTERVAL '1 day'),
+  -- Frete 2 (ABERTO)
+  ('f0000000-0000-0000-0000-000000000002', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO', NOW() - INTERVAL '2 hours'),
 
-  -- Frete 4 (CARREGANDO / NF_RECEBIDA)
-  ('f0000000-0000-0000-0000-000000000004', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '3 days'),
-  ('f0000000-0000-0000-0000-000000000004', 'STATUS_ALTERADO', 'Frete programado', 'PROGRAMADO', NOW() - INTERVAL '2 days'),
-  ('f0000000-0000-0000-0000-000000000004', 'STATUS_ALTERADO', 'Início do carregamento', 'CARREGANDO', NOW() - INTERVAL '1 hour'),
-  ('f0000000-0000-0000-0000-000000000004', 'DOCUMENTO_ENVIADO', 'NF-e recebida e validada', 'NF_RECEBIDA', NOW() - INTERVAL '30 minutes'),
+  -- Frete 3 (CARREGANDO)
+  ('f0000000-0000-0000-0000-000000000003', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',     NOW() - INTERVAL '2 days'),
+  ('f0000000-0000-0000-0000-000000000003', 'STATUS_ALTERADO','Início do carregamento', 'ABERTO', 'CARREGANDO', NOW() - INTERVAL '30 minutes'),
 
-  -- Frete 5 (EM_VIAGEM / CT_E_EMITIDO)
-  ('f0000000-0000-0000-0000-000000000005', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '4 days'),
-  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO', 'Frete programado', 'PROGRAMADO', NOW() - INTERVAL '3 days'),
-  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO', 'Início do carregamento', 'CARREGANDO', NOW() - INTERVAL '2 days'),
-  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO', 'Veículo em trânsito', 'EM_VIAGEM', NOW() - INTERVAL '4 hours'),
-  ('f0000000-0000-0000-0000-000000000005', 'CTE_EMITIDO', 'CT-e emitido com sucesso', 'CT_E_EMITIDO', NOW() - INTERVAL '4 hours'),
+  -- Frete 4 (AGUARDANDO_CTE)
+  ('f0000000-0000-0000-0000-000000000004', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',        NOW() - INTERVAL '3 days'),
+  ('f0000000-0000-0000-0000-000000000004', 'STATUS_ALTERADO','Início do carregamento', 'ABERTO',     'CARREGANDO',    NOW() - INTERVAL '2 days'),
+  ('f0000000-0000-0000-0000-000000000004', 'STATUS_ALTERADO','Carregamento concluído — aguardando CT-e', 'CARREGANDO', 'AGUARDANDO_CTE', NOW() - INTERVAL '2 hours'),
 
-  -- Frete 6 (FINALIZADO)
-  ('f0000000-0000-0000-0000-000000000006', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '7 days'),
-  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO', 'Frete programado', 'PROGRAMADO', NOW() - INTERVAL '6 days'),
-  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO', 'Início do carregamento', 'CARREGANDO', NOW() - INTERVAL '5 days'),
-  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO', 'Veículo em trânsito', 'EM_VIAGEM', NOW() - INTERVAL '4 days'),
-  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO', 'Entrega realizada com sucesso', 'FINALIZADO', NOW() - INTERVAL '3 days'),
+  -- Frete 5 (CTE_EMITIDO)
+  ('f0000000-0000-0000-0000-000000000005', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',         NOW() - INTERVAL '4 days'),
+  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO','Início do carregamento', 'ABERTO',      'CARREGANDO',     NOW() - INTERVAL '3 days'),
+  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO','Carregamento concluído', 'CARREGANDO',  'AGUARDANDO_CTE', NOW() - INTERVAL '2 days'),
+  ('f0000000-0000-0000-0000-000000000005', 'STATUS_ALTERADO','CT-e emitido: 35240612345678000195570010000012341234567890', 'AGUARDANDO_CTE', 'CTE_EMITIDO', NOW() - INTERVAL '1 hour'),
+
+  -- Frete 6 (EM_VIAGEM)
+  ('f0000000-0000-0000-0000-000000000006', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',         NOW() - INTERVAL '5 days'),
+  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO','Início do carregamento', 'ABERTO',      'CARREGANDO',     NOW() - INTERVAL '4 days'),
+  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO','Carregamento concluído', 'CARREGANDO',  'AGUARDANDO_CTE', NOW() - INTERVAL '3 days'),
+  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO','CT-e emitido: 35240698765432000196570010000056785678901234', 'AGUARDANDO_CTE', 'CTE_EMITIDO', NOW() - INTERVAL '2 days'),
+  ('f0000000-0000-0000-0000-000000000006', 'STATUS_ALTERADO','Veículo liberado — em trânsito', 'CTE_EMITIDO', 'EM_VIAGEM', NOW() - INTERVAL '4 hours'),
 
   -- Frete 7 (FINALIZADO)
-  ('f0000000-0000-0000-0000-000000000007', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '12 days'),
-  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO', 'Entrega realizada', 'FINALIZADO', NOW() - INTERVAL '8 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',         NOW() - INTERVAL '12 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO','Início do carregamento', 'ABERTO',      'CARREGANDO',     NOW() - INTERVAL '11 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO','Carregamento concluído', 'CARREGANDO',  'AGUARDANDO_CTE', NOW() - INTERVAL '10 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO','CT-e emitido: 35240611122233000144570010000078907890123456', 'AGUARDANDO_CTE', 'CTE_EMITIDO', NOW() - INTERVAL '10 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO','Veículo em trânsito', 'CTE_EMITIDO',   'EM_VIAGEM',      NOW() - INTERVAL '9 days'),
+  ('f0000000-0000-0000-0000-000000000007', 'STATUS_ALTERADO','Entrega realizada com sucesso', 'EM_VIAGEM', 'FINALIZADO', NOW() - INTERVAL '8 days'),
 
   -- Frete 8 (CANCELADO)
-  ('f0000000-0000-0000-0000-000000000008', 'FRETE_CRIADO', 'Frete criado', 'ABERTO', NOW() - INTERVAL '8 days'),
-  ('f0000000-0000-0000-0000-000000000008', 'FRETE_CANCELADO', 'Cancelado: cliente solicitou cancelamento', 'CANCELADO', NOW() - INTERVAL '7 days');
+  ('f0000000-0000-0000-0000-000000000008', 'FRETE_CRIADO',   'Frete criado', NULL, 'ABERTO',    NOW() - INTERVAL '8 days'),
+  ('f0000000-0000-0000-0000-000000000008', 'FRETE_CANCELADO','Cancelado: cliente solicitou cancelamento por mudança na demanda.', 'ABERTO', 'CANCELADO', NOW() - INTERVAL '7 days');
