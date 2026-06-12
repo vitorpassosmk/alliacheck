@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { validarTransicao, derivarCteStatus } from '@/lib/state-machine'
+import { validarTransicao } from '@/lib/state-machine'
+import { validarChaveNFe } from '@/lib/validations/chave-nfe'
 import { invalidUUID } from '@/lib/api-helpers'
 import type { StatusViagem } from '@/lib/state-machine'
 
@@ -22,42 +23,41 @@ export async function PATCH(
     return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
   }
 
-  const { status: novoStatus, motivo }: { status: StatusViagem; motivo?: string } =
-    await request.json()
+  const body: { status: string; chave_cte?: string; motivo?: string } = await request.json()
+  const novoStatus = body.status as StatusViagem
+  const { chave_cte, motivo } = body
 
   const motivoSanitizado = motivo?.trim().slice(0, 500)
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, cte_status, motorista_id, veiculo_id, data_carregamento')
+    .select('status, motorista_id, veiculo_id, data_carregamento')
     .eq('id', id)
     .single()
 
   if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
 
-  if (!validarTransicao(frete.status, novoStatus)) {
+  if (!validarTransicao(frete.status as StatusViagem, novoStatus)) {
     return Response.json(
       { error: `Transição ${frete.status} → ${novoStatus} não permitida` },
       { status: 422 }
     )
   }
 
-  if (novoStatus === 'PROGRAMADO') {
-    if (!frete.motorista_id || !frete.veiculo_id || !frete.data_carregamento) {
-      return Response.json(
-        { error: 'Motorista, veículo e data de carregamento são obrigatórios para PROGRAMADO' },
-        { status: 422 }
-      )
+  if (novoStatus === 'CTE_EMITIDO') {
+    if (!chave_cte) {
+      return Response.json({ error: 'Chave CT-e é obrigatória para CTE_EMITIDO' }, { status: 422 })
+    }
+    if (!validarChaveNFe(chave_cte)) {
+      return Response.json({ error: 'Chave CT-e inválida (44 dígitos, módulo 11)' }, { status: 422 })
     }
   }
-
-  const novoCteStatus = derivarCteStatus(novoStatus, frete.cte_status)
 
   const { error: updateError } = await supabase
     .from('fretes')
     .update({
       status: novoStatus,
-      ...(novoCteStatus ? { cte_status: novoCteStatus } : {}),
+      ...(novoStatus === 'CTE_EMITIDO' && chave_cte ? { chave_cte } : {}),
       ...(novoStatus === 'CANCELADO' && motivoSanitizado ? { observacoes: motivoSanitizado } : {}),
     })
     .eq('id', id)
@@ -78,5 +78,5 @@ export async function PATCH(
     user_agent: request.headers.get('user-agent'),
   })
 
-  return Response.json({ ok: true, novoStatus, novoCteStatus })
+  return Response.json({ ok: true, novoStatus })
 }

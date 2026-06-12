@@ -9,10 +9,10 @@ const FreteCreateSchema = z.object({
   destino_uf: z.string().length(2),
   tipo_veiculo: z.string().optional().nullable(),
   valor_frete: z.number().positive().optional().nullable(),
-  data_carregamento: z.string().optional().nullable(),
+  data_carregamento: z.string().min(1),
   data_entrega_prevista: z.string().optional().nullable(),
-  motorista_id: z.string().uuid().optional().nullable(),
-  veiculo_id: z.string().uuid().optional().nullable(),
+  motorista_id: z.string().uuid(),
+  veiculo_id: z.string().uuid(),
   observacoes: z.string().optional().nullable(),
 })
 
