@@ -14,24 +14,21 @@ import type { FreteComRelacoes } from '@/services/fretes.service'
 
 type KpiData = {
   aberto: number
-  programado: number
+  carregando: number
+  aguardandoCte: number
+  cteEmitido: number
   emViagem: number
   finalizado: number
-  ctesPendentes: number
-  totalHoje: number
 }
 
 function calcularKpis(fretes: FreteComRelacoes[]): KpiData {
-  const hoje = new Date().toISOString().slice(0, 10)
   return {
-    aberto: fretes.filter((f) => f.status === 'ABERTO').length,
-    programado: fretes.filter((f) => f.status === 'PROGRAMADO').length,
-    emViagem: fretes.filter((f) => f.status === 'EM_VIAGEM').length,
-    finalizado: fretes.filter((f) => f.status === 'FINALIZADO').length,
-    ctesPendentes: fretes.filter(
-      (f) => f.cte_status === 'PENDENTE' && f.status !== 'CANCELADO'
-    ).length,
-    totalHoje: fretes.filter((f) => f.criado_em.slice(0, 10) === hoje).length,
+    aberto:        fretes.filter((f) => f.status === 'ABERTO').length,
+    carregando:    fretes.filter((f) => f.status === 'CARREGANDO').length,
+    aguardandoCte: fretes.filter((f) => f.status === 'AGUARDANDO_CTE').length,
+    cteEmitido:    fretes.filter((f) => f.status === 'CTE_EMITIDO').length,
+    emViagem:      fretes.filter((f) => f.status === 'EM_VIAGEM').length,
+    finalizado:    fretes.filter((f) => f.status === 'FINALIZADO').length,
   }
 }
 
@@ -110,20 +107,32 @@ export default function DashboardPage() {
               title="Abertos"
               value={kpis?.aberto ?? 0}
               icon={Package}
-              description="Aguardando programação"
+              description="Aguardando carregamento"
             />
             <KpiCard
-              title="Programados"
-              value={kpis?.programado ?? 0}
+              title="Carregando"
+              value={kpis?.carregando ?? 0}
               icon={Truck}
-              description="Com motorista e veículo"
+              description="Em carregamento"
+            />
+            <KpiCard
+              title="Aguard. CT-e"
+              value={kpis?.aguardandoCte ?? 0}
+              icon={AlertCircle}
+              description="Aguardam emissão CT-e"
+              variant={kpis && kpis.aguardandoCte > 0 ? 'warning' : 'default'}
+            />
+            <KpiCard
+              title="CT-e Emitido"
+              value={kpis?.cteEmitido ?? 0}
+              icon={CheckCircle2}
+              description="CT-e registrado"
             />
             <KpiCard
               title="Em Viagem"
               value={kpis?.emViagem ?? 0}
               icon={TrendingUp}
               description="Em trânsito"
-              variant="default"
             />
             <KpiCard
               title="Finalizados"
@@ -131,19 +140,6 @@ export default function DashboardPage() {
               icon={CheckCircle2}
               description="Concluídos"
               variant="success"
-            />
-            <KpiCard
-              title="CT-e Pendentes"
-              value={kpis?.ctesPendentes ?? 0}
-              icon={AlertCircle}
-              description="Aguardam emissão"
-              variant={kpis && kpis.ctesPendentes > 0 ? 'warning' : 'default'}
-            />
-            <KpiCard
-              title="Criados Hoje"
-              value={kpis?.totalHoje ?? 0}
-              icon={Plus}
-              description="Novos fretes"
             />
           </>
         )}
