@@ -26,22 +26,22 @@ interface KanbanColumnProps {
 export function KanbanColumn({ status, fretes, loading, onCardClick }: KanbanColumnProps) {
   return (
     <div className={cn(
-      'snap-start flex-shrink-0 w-[300px] md:w-auto md:flex-1 flex flex-col gap-2 rounded-t-md',
+      'snap-start flex-shrink-0 w-[260px] md:w-auto md:flex-1 flex flex-col h-full rounded-t-md',
       columnBorder[status]
     )}>
-      <div className="flex items-center justify-between px-1 py-2 sticky top-0 bg-gray-50 z-10">
+      <div className="flex items-center justify-between px-1 py-2 shrink-0 bg-gray-50 rounded-t-md">
         <StatusBadge status={status} />
         <span className="text-xs text-muted-foreground font-medium">{fretes.length}</span>
       </div>
 
-      <div className="flex flex-col gap-2 min-h-[100px]">
+      <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-hidden pt-1">
         {loading ? (
           <>
-            <Skeleton className="h-28 rounded-lg" />
-            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="h-16 rounded-lg shrink-0" />
+            <Skeleton className="h-16 rounded-lg shrink-0" />
           </>
         ) : fretes.length === 0 ? (
-          <div className="text-center text-xs text-muted-foreground py-8 border-2 border-dashed rounded-lg">
+          <div className="text-center text-xs text-muted-foreground py-6 border-2 border-dashed rounded-lg mx-0.5">
             Nenhum frete
           </div>
         ) : (
