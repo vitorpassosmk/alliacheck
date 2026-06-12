@@ -147,8 +147,9 @@ export type Database = {
           cliente_id: string | null
           motorista_id: string | null
           veiculo_id: string | null
-          status: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
           cte_status: 'PENDENTE' | 'AGUARDANDO_NF' | 'NF_RECEBIDA' | 'CT_E_EMITIDO' | 'CT_E_CANCELADO'
+          chave_cte: string | null
           origem_cidade: string
           origem_uf: string
           destino_cidade: string
@@ -168,8 +169,9 @@ export type Database = {
           cliente_id?: string | null
           motorista_id?: string | null
           veiculo_id?: string | null
-          status?: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status?: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
           cte_status?: 'PENDENTE' | 'AGUARDANDO_NF' | 'NF_RECEBIDA' | 'CT_E_EMITIDO' | 'CT_E_CANCELADO'
+          chave_cte?: string | null
           origem_cidade: string
           origem_uf: string
           destino_cidade: string
@@ -189,8 +191,9 @@ export type Database = {
           cliente_id?: string | null
           motorista_id?: string | null
           veiculo_id?: string | null
-          status?: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status?: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
           cte_status?: 'PENDENTE' | 'AGUARDANDO_NF' | 'NF_RECEBIDA' | 'CT_E_EMITIDO' | 'CT_E_CANCELADO'
+          chave_cte?: string | null
           origem_cidade?: string
           origem_uf?: string
           destino_cidade?: string

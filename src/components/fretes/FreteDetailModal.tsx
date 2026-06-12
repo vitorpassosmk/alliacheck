@@ -3,14 +3,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { StatusBadge, CTEStatusBadge } from '@/components/kanban/StatusBadge'
-import { DocumentUpload } from '@/components/documentos/DocumentUpload'
-import { DocumentList } from '@/components/documentos/DocumentList'
-import { ConferenceChecklist } from '@/components/checklist/ConferenceChecklist'
+import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { EventTimeline } from '@/components/eventos/EventTimeline'
 import { FreteFormModal } from './FreteFormModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
@@ -23,14 +19,15 @@ type FreteCompleto = Tables<'fretes'> & {
   clientes: Tables<'clientes'> | null
   motoristas: Tables<'motoristas'> | null
   veiculos: Tables<'veiculos'> | null
-  documentos: Tables<'documentos'>[]
   eventos: Tables<'eventos'>[]
+  chave_cte?: string | null
 }
 
 const statusLabel: Record<StatusViagem, string> = {
-  ABERTO: 'Programar',
-  PROGRAMADO: 'Iniciar Carregamento',
-  CARREGANDO: 'Iniciar Viagem',
+  ABERTO: 'Iniciar Carregamento',
+  CARREGANDO: 'Aguardar CT-e',
+  AGUARDANDO_CTE: 'Registrar CT-e',
+  CTE_EMITIDO: 'Iniciar Viagem',
   EM_VIAGEM: 'Finalizar',
   FINALIZADO: '',
   CANCELADO: '',
@@ -46,6 +43,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
   const [cancelando, setCancelando] = useState(false)
+  const [chaveCte, setChaveCte] = useState('')
+  const [chaveCteError, setChaveCteError] = useState('')
 
   const { data: frete, isLoading } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -55,10 +54,14 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
   const avancarStatus = useMutation({
     mutationFn: async (novoStatus: StatusViagem) => {
+      const body: Record<string, unknown> = { status: novoStatus }
+      if (novoStatus === 'CTE_EMITIDO') {
+        body.chave_cte = chaveCte
+      }
       const res = await fetch(`/api/fretes/${freteId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: novoStatus }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error((await res.json()).error ?? 'Erro ao avançar status')
       return res.json()
@@ -66,9 +69,14 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
       queryClient.invalidateQueries({ queryKey: ['fretes'] })
+      setChaveCte('')
+      setChaveCteError('')
       toast.success('Status atualizado')
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setChaveCteError(e.message)
+      toast.error(e.message)
+    },
   })
 
   const cancelar = useMutation({
@@ -90,7 +98,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const proximos = frete ? (TRANSICOES_VIAGEM[frete.status] ?? []).filter(s => s !== 'CANCELADO') : []
+  const proximos = frete ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO') : []
   const podeAvancar = proximos.length > 0
   const nextStatus = proximos[0] as StatusViagem | undefined
 
@@ -111,16 +119,13 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                   <div className="space-y-1">
                     <DialogTitle className="flex items-center gap-2">
                       Frete #{frete.id.slice(-6).toUpperCase()}
-                      <StatusBadge status={frete.status} />
+                      <StatusBadge status={frete.status as StatusViagem} />
                     </DialogTitle>
-                    <div className="flex items-center gap-2">
-                      <CTEStatusBadge status={frete.cte_status} pulsante />
-                      {frete.clientes && (
-                        <span className="text-sm text-muted-foreground">
-                          {frete.clientes.razao_social}
-                        </span>
-                      )}
-                    </div>
+                    {frete.clientes && (
+                      <span className="text-sm text-muted-foreground">
+                        {frete.clientes.razao_social}
+                      </span>
+                    )}
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => setEditOpen(true)}>
                     <Edit className="h-4 w-4" />
@@ -128,58 +133,73 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 </div>
               </DialogHeader>
 
-              {/* Resumo */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  <span>{frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}</span>
-                </div>
-                {frete.motoristas && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <User className="h-4 w-4 shrink-0" />
-                    <span>{frete.motoristas.nome}</span>
-                  </div>
-                )}
-                {frete.veiculos && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Truck className="h-4 w-4 shrink-0" />
-                    <span>{frete.veiculos.placa} — {frete.veiculos.tipo}</span>
-                  </div>
-                )}
-                {frete.data_carregamento && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4 shrink-0" />
-                    <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  </div>
-                )}
-                {frete.valor_frete && (
-                  <div className="text-muted-foreground">
-                    Frete: R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                )}
-              </div>
-
               {/* Ações de status */}
               {frete.status !== 'FINALIZADO' && frete.status !== 'CANCELADO' && (
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  {podeAvancar && nextStatus && (
+                <div className="flex flex-col gap-3 p-3 bg-gray-50 rounded-lg">
+                  {nextStatus === 'CTE_EMITIDO' ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Chave CT-e (44 dígitos)</label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={chaveCte}
+                          onChange={(e) => {
+                            setChaveCte(e.target.value.replace(/\D/g, '').slice(0, 44))
+                            setChaveCteError('')
+                          }}
+                          placeholder="00000000000000000000000000000000000000000000"
+                          className="font-mono text-xs"
+                          maxLength={44}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => avancarStatus.mutate('CTE_EMITIDO')}
+                          disabled={chaveCte.length !== 44 || avancarStatus.isPending}
+                        >
+                          Confirmar CT-e
+                        </Button>
+                      </div>
+                      {chaveCteError && <p className="text-xs text-destructive">{chaveCteError}</p>}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setCancelando(true)}
+                        disabled={cancelando}
+                        className="w-fit"
+                      >
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Cancelar Frete
+                      </Button>
+                    </div>
+                  ) : podeAvancar && nextStatus ? (
+                    <div className="flex items-center gap-3">
+                      <Button
+                        size="sm"
+                        onClick={() => avancarStatus.mutate(nextStatus)}
+                        disabled={avancarStatus.isPending}
+                      >
+                        {statusLabel[frete.status as StatusViagem] || `Avançar para ${nextStatus}`}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setCancelando(true)}
+                        disabled={cancelando}
+                      >
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Cancelar Frete
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
                       size="sm"
-                      onClick={() => avancarStatus.mutate(nextStatus)}
-                      disabled={avancarStatus.isPending}
+                      variant="destructive"
+                      onClick={() => setCancelando(true)}
+                      disabled={cancelando}
                     >
-                      {statusLabel[frete.status] || `Avançar para ${nextStatus}`}
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Cancelar Frete
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setCancelando(true)}
-                    disabled={cancelando}
-                  >
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Cancelar Frete
-                  </Button>
                 </div>
               )}
 
@@ -191,31 +211,56 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 />
               )}
 
-              {/* Tabs */}
-              <Tabs defaultValue="documentos">
-                <TabsList className="w-full">
-                  <TabsTrigger value="documentos" className="flex-1">
-                    Documentos ({frete.documentos?.length ?? 0})
-                  </TabsTrigger>
-                  <TabsTrigger value="checklist" className="flex-1">Conferência CT-e</TabsTrigger>
-                  <TabsTrigger value="historico" className="flex-1">Histórico</TabsTrigger>
-                </TabsList>
+              {/* Informações */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground col-span-2">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span>{frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}</span>
+                  </div>
+                  {frete.motoristas && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <User className="h-4 w-4 shrink-0" />
+                      <span>{frete.motoristas.nome}</span>
+                    </div>
+                  )}
+                  {frete.veiculos && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Truck className="h-4 w-4 shrink-0" />
+                      <span>{frete.veiculos.placa} — {frete.veiculos.tipo}</span>
+                    </div>
+                  )}
+                  {frete.data_carregamento && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="h-4 w-4 shrink-0" />
+                      <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  )}
+                  {frete.valor_frete && (
+                    <div className="text-muted-foreground">
+                      Frete: R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  {frete.chave_cte && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Chave CT-e: </span>
+                      <span className="font-mono text-xs break-all">{frete.chave_cte}</span>
+                    </div>
+                  )}
+                  {frete.observacoes && (
+                    <div className="col-span-2 text-muted-foreground">
+                      <span className="font-medium">Obs: </span>{frete.observacoes}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                <TabsContent value="documentos" className="space-y-4 mt-4">
-                  <DocumentUpload freteId={freteId} onSuccess={() =>
-                    queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
-                  } />
-                  <DocumentList documentos={frete.documentos ?? []} />
-                </TabsContent>
-
-                <TabsContent value="checklist" className="mt-4">
-                  <ConferenceChecklist freteId={freteId} cteStatus={frete.cte_status} />
-                </TabsContent>
-
-                <TabsContent value="historico" className="mt-4">
-                  <EventTimeline eventos={frete.eventos ?? []} />
-                </TabsContent>
-              </Tabs>
+              {/* Histórico */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Histórico</h3>
+                <EventTimeline eventos={frete.eventos ?? []} />
+              </div>
             </>
           )}
         </DialogContent>
