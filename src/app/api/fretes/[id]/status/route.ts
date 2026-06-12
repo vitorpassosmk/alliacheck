@@ -19,13 +19,18 @@ export async function PATCH(
   const { data: perfil } = await supabase
     .from('users').select('papel').eq('id', user.id).single()
 
-  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+  if (!perfil) {
     return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
   }
 
   const body: { status: string; chave_cte?: string; motivo?: string } = await request.json()
   const novoStatus = body.status as StatusViagem
   const { chave_cte, motivo } = body
+
+  // Cancelamento é exclusivo de ADMIN
+  if (novoStatus === 'CANCELADO' && perfil.papel !== 'ADMIN') {
+    return Response.json({ error: 'Apenas ADMINs podem cancelar fretes' }, { status: 403 })
+  }
 
   const motivoSanitizado = motivo?.trim().slice(0, 500)
 
