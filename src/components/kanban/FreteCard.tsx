@@ -1,15 +1,19 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { CTEStatusBadge } from './StatusBadge'
-import { MapPin, User, Truck } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { MapPin, User, Truck, Calendar } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { Tables } from '@/types/database.types'
+import type { StatusViagem } from '@/lib/state-machine'
 
 type FreteComRelacoes = Tables<'fretes'> & {
   clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
   motoristas: Pick<Tables<'motoristas'>, 'nome'> | null
   veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo'> | null
 }
+
+const CTE_STATES: StatusViagem[] = ['CTE_EMITIDO', 'EM_VIAGEM', 'FINALIZADO']
 
 interface FreteCardProps {
   frete: FreteComRelacoes
@@ -18,16 +22,26 @@ interface FreteCardProps {
 
 export function FreteCard({ frete, onClick }: FreteCardProps) {
   const idCurto = frete.id.slice(-6).toUpperCase()
+  const status = frete.status as StatusViagem
+  const showCteBadge = CTE_STATES.includes(status)
+  const isFinished = status === 'FINALIZADO'
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-shadow border"
+      className={cn(
+        'cursor-pointer hover:shadow-md transition-shadow border',
+        isFinished && 'opacity-70'
+      )}
       onClick={() => onClick(frete)}
     >
       <CardContent className="p-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono text-muted-foreground">#{idCurto}</span>
-          <CTEStatusBadge status={frete.cte_status} pulsante />
+          {showCteBadge && (
+            <Badge variant="outline" className="text-xs bg-[#E0F9F9] text-[#0E7490] border-[#06b6d4]/30">
+              CT-e ✓
+            </Badge>
+          )}
         </div>
 
         {frete.clientes && (
@@ -56,8 +70,29 @@ export function FreteCard({ frete, onClick }: FreteCardProps) {
         )}
 
         {frete.data_carregamento && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="h-3 w-3 shrink-0" />
+            <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+          </div>
+        )}
+
+        {frete.valor_frete ? (
           <p className="text-xs text-muted-foreground">
-            Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}
+            R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">—</p>
+        )}
+
+        {frete.tipo_carga && (
+          <Badge variant="outline" className="text-xs bg-[#F3E8FF] text-[#7C3AED] border-[#7C3AED]/20">
+            {frete.tipo_carga}
+          </Badge>
+        )}
+
+        {showCteBadge && frete.chave_cte && (
+          <p className="text-[10px] font-mono text-muted-foreground break-all leading-tight">
+            {frete.chave_cte}
           </p>
         )}
       </CardContent>

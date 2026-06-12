@@ -1,6 +1,7 @@
 import { StatusBadge } from './StatusBadge'
 import { FreteCard } from './FreteCard'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import type { StatusViagem } from '@/lib/state-machine'
 import type { Tables } from '@/types/database.types'
 
@@ -8,6 +9,11 @@ type FreteComRelacoes = Tables<'fretes'> & {
   clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
   motoristas: Pick<Tables<'motoristas'>, 'nome'> | null
   veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo'> | null
+}
+
+const columnBorder: Partial<Record<StatusViagem, string>> = {
+  AGUARDANDO_CTE: 'border-l-[3px] border-l-[#f97316]',
+  CTE_EMITIDO:    'border-l-[3px] border-l-[#06b6d4]',
 }
 
 interface KanbanColumnProps {
@@ -19,7 +25,10 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ status, fretes, loading, onCardClick }: KanbanColumnProps) {
   return (
-    <div className="snap-start flex-shrink-0 w-[300px] md:w-auto md:flex-1 flex flex-col gap-2">
+    <div className={cn(
+      'snap-start flex-shrink-0 w-[300px] md:w-auto md:flex-1 flex flex-col gap-2 rounded-t-md',
+      columnBorder[status]
+    )}>
       <div className="flex items-center justify-between px-1 py-2 sticky top-0 bg-gray-50 z-10">
         <StatusBadge status={status} />
         <span className="text-xs text-muted-foreground font-medium">{fretes.length}</span>
