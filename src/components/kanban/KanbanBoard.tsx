@@ -1,33 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { COLUNAS_KANBAN } from '@/lib/state-machine'
 import { KanbanColumn } from './KanbanColumn'
-import type { Tables } from '@/types/database.types'
+import type { FreteComRelacoes } from '@/services/fretes.service'
 import type { StatusViagem } from '@/lib/state-machine'
-
-type FreteComRelacoes = Tables<'fretes'> & {
-  clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
-  motoristas: Pick<Tables<'motoristas'>, 'nome'> | null
-  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo'> | null
-}
 
 interface KanbanBoardProps {
   onCardClick: (frete: FreteComRelacoes) => void
 }
 
 async function fetchFretes(supabase: ReturnType<typeof createClient>) {
+  const agora = new Date()
+  const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000).toISOString()
+
   const { data, error } = await supabase
     .from('fretes')
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome),
-      veiculos(placa, tipo)
+      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
+      veiculos(placa, tipo, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .neq('status', 'CANCELADO')
+    .or(`status.neq.CONCLUIDA,atualizado_em.gte.${limite24h}`)
     .order('criado_em', { ascending: false })
 
   if (error) throw error
@@ -43,7 +41,6 @@ export function KanbanBoard({ onCardClick }: KanbanBoardProps) {
     queryFn: () => fetchFretes(supabase),
   })
 
-  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('fretes-changes')

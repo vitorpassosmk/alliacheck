@@ -23,20 +23,16 @@ export async function PATCH(
     return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
   }
 
-  const body: { status: string; chave_cte?: string; motivo?: string } = await request.json()
+  const body: Record<string, unknown> = await request.json()
   const novoStatus = body.status as StatusViagem
-  const { chave_cte, motivo } = body
 
-  // Cancelamento é exclusivo de ADMIN
   if (novoStatus === 'CANCELADO' && perfil.papel !== 'ADMIN') {
     return Response.json({ error: 'Apenas ADMINs podem cancelar fretes' }, { status: 403 })
   }
 
-  const motivoSanitizado = motivo?.trim().slice(0, 500)
-
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, motorista_id, veiculo_id, data_carregamento')
+    .select('status, numero_frete')
     .eq('id', id)
     .single()
 
@@ -49,22 +45,67 @@ export async function PATCH(
     )
   }
 
+  // Campos adicionais a atualizar no frete conforme a transição
+  const camposAdicionais: Record<string, unknown> = {}
+
+  if (novoStatus === 'PROGRAMADO') {
+    const motorista_id = body.motorista_id as string | undefined
+    const veiculo_id = body.veiculo_id as string | undefined
+    if (!motorista_id || !veiculo_id) {
+      return Response.json({ error: 'Selecione motorista e veículo para programar o frete' }, { status: 422 })
+    }
+    camposAdicionais.motorista_id = motorista_id
+    camposAdicionais.veiculo_id = veiculo_id
+  }
+
+  if (novoStatus === 'CARREGANDO') {
+    const numero_gr = (body.numero_gr as string | undefined)?.trim()
+    if (!numero_gr) {
+      return Response.json({ error: 'N° GR (contrato de seguro) é obrigatório para iniciar o carregamento' }, { status: 422 })
+    }
+    camposAdicionais.numero_gr = numero_gr
+  }
+
   if (novoStatus === 'CTE_EMITIDO') {
+    const chave_cte = body.chave_cte as string | undefined
     if (!chave_cte) {
-      return Response.json({ error: 'Chave CT-e é obrigatória para CTE_EMITIDO' }, { status: 422 })
+      return Response.json({ error: 'Chave CT-e é obrigatória' }, { status: 422 })
     }
     if (!validarChaveNFe(chave_cte)) {
       return Response.json({ error: 'Chave CT-e inválida (44 dígitos, módulo 11)' }, { status: 422 })
     }
+    camposAdicionais.chave_cte = chave_cte
+  }
+
+  if (novoStatus === 'AGUARDANDO_LIBERACAO') {
+    const numero_contrato = (body.numero_contrato as string | undefined)?.trim()
+    const numero_ciot = (body.numero_ciot as string | undefined)?.trim()
+    const valor_adiantamento = body.valor_adiantamento as number | undefined
+    if (!numero_contrato) {
+      return Response.json({ error: 'N° do contrato é obrigatório' }, { status: 422 })
+    }
+    if (!numero_ciot) {
+      return Response.json({ error: 'N° CIOT é obrigatório' }, { status: 422 })
+    }
+    if (!valor_adiantamento || valor_adiantamento <= 0) {
+      return Response.json({ error: 'Valor de adiantamento é obrigatório e deve ser maior que zero' }, { status: 422 })
+    }
+    camposAdicionais.numero_contrato = numero_contrato
+    camposAdicionais.numero_ciot = numero_ciot
+    camposAdicionais.valor_adiantamento = valor_adiantamento
+  }
+
+  const motivoSanitizado = novoStatus === 'CANCELADO'
+    ? (body.motivo as string | undefined)?.trim().slice(0, 500)
+    : undefined
+
+  if (novoStatus === 'CANCELADO' && motivoSanitizado) {
+    camposAdicionais.observacoes = motivoSanitizado
   }
 
   const { error: updateError } = await supabase
     .from('fretes')
-    .update({
-      status: novoStatus,
-      ...(novoStatus === 'CTE_EMITIDO' && chave_cte ? { chave_cte } : {}),
-      ...(novoStatus === 'CANCELADO' && motivoSanitizado ? { observacoes: motivoSanitizado } : {}),
-    })
+    .update({ status: novoStatus, ...camposAdicionais })
     .eq('id', id)
 
   if (updateError) {

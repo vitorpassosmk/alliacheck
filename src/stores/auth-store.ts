@@ -21,6 +21,7 @@ type AuthState = {
   isSupervisor: () => boolean
   isConferente: () => boolean
   podeGerenciar: () => boolean
+  podeCadastrarRecurso: () => boolean
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -35,4 +36,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const papel = get().user?.papel
     return papel === 'ADMIN' || papel === 'SUPERVISOR'
   },
+  podeCadastrarRecurso: () => get().user !== null,
 }))

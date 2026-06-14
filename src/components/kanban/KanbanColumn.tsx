@@ -3,17 +3,11 @@ import { FreteCard } from './FreteCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import type { StatusViagem } from '@/lib/state-machine'
-import type { Tables } from '@/types/database.types'
-
-type FreteComRelacoes = Tables<'fretes'> & {
-  clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
-  motoristas: Pick<Tables<'motoristas'>, 'nome'> | null
-  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo'> | null
-}
+import type { FreteComRelacoes } from '@/services/fretes.service'
 
 const columnBorder: Partial<Record<StatusViagem, string>> = {
-  AGUARDANDO_CTE: 'border-l-[3px] border-l-[#f97316]',
-  CTE_EMITIDO:    'border-l-[3px] border-l-[#06b6d4]',
+  CTE_EMITIDO:          'border-l-[3px] border-l-[#06b6d4]',
+  AGUARDANDO_LIBERACAO: 'border-l-[3px] border-l-[#d97706]',
 }
 
 interface KanbanColumnProps {

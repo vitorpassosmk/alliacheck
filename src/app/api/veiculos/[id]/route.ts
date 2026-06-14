@@ -2,14 +2,22 @@ import { createClient } from '@/lib/supabase/server'
 import { invalidUUID } from '@/lib/api-helpers'
 import { z } from 'zod'
 
+const TIPOS_VEICULO = ['VAN', 'TOCO', 'TRUCK', 'BITRUCK', 'CARRETA', 'CARRETA_LS', 'BITREM'] as const
+
 const VeiculoUpdateSchema = z.object({
   placa: z.string().min(7).optional(),
-  tipo: z.enum(['VAN', 'TOCO', 'TRUCK', 'BITRUCK', 'CARRETA', 'BITREM']).optional(),
+  tipo: z.enum(TIPOS_VEICULO).optional(),
   modelo: z.string().nullable().optional(),
   ano: z.number().int().nullable().optional(),
   proprietario: z.string().nullable().optional(),
-  rntrc: z.string().nullable().optional(),
   ativo: z.boolean().optional(),
+  tipo_veiculo: z.enum(['FROTA', 'AGREGADO']).nullable().optional(),
+  tem_placas_separadas: z.boolean().optional(),
+  placa_carreta: z.string().nullable().optional(),
+  cpf_proprietario: z.string().nullable().optional(),
+  banco_proprietario: z.string().nullable().optional(),
+  agencia_conta_proprietario: z.string().nullable().optional(),
+  chave_pix_proprietario: z.string().nullable().optional(),
 })
 
 export async function PATCH(
@@ -23,11 +31,6 @@ export async function PATCH(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-
-  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
-  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
-    return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
-  }
 
   const body = await request.json()
   const parsed = VeiculoUpdateSchema.safeParse(body)

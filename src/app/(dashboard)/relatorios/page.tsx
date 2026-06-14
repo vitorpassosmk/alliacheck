@@ -136,11 +136,12 @@ export default function RelatoriosPage() {
               <SelectContent>
                 <SelectItem value="">Todos</SelectItem>
                 <SelectItem value="ABERTO">Aberto</SelectItem>
+                <SelectItem value="PROGRAMADO">Programado</SelectItem>
                 <SelectItem value="CARREGANDO">Carregando</SelectItem>
-                <SelectItem value="AGUARDANDO_CTE">Aguard. CT-e</SelectItem>
                 <SelectItem value="CTE_EMITIDO">CT-e Emitido</SelectItem>
+                <SelectItem value="AGUARDANDO_LIBERACAO">Aguard. Liberação</SelectItem>
                 <SelectItem value="EM_VIAGEM">Em Viagem</SelectItem>
-                <SelectItem value="FINALIZADO">Finalizado</SelectItem>
+                <SelectItem value="CONCLUIDA">Concluída</SelectItem>
                 <SelectItem value="CANCELADO">Cancelado</SelectItem>
               </SelectContent>
             </Select>

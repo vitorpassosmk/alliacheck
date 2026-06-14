@@ -17,14 +17,14 @@ import type { Tables } from '@/types/database.types'
 const UFs = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 
 const FreteSchema = z.object({
+  numero_frete: z.string().min(1, 'Obrigatório'),
   origem_cidade: z.string().min(1, 'Obrigatório'),
   origem_uf: z.string().length(2, 'UF inválida'),
   destino_cidade: z.string().min(1, 'Obrigatório'),
   destino_uf: z.string().length(2, 'UF inválida'),
   cliente_id: z.string().uuid().nullable().optional(),
-  motorista_id: z.string().uuid('Selecione o motorista'),
-  veiculo_id: z.string().uuid('Selecione o veículo'),
-  tipo_veiculo: z.string().nullable().optional(),
+  tipo_produto: z.string().nullable().optional(),
+  valor_mercadoria: z.string().optional(),
   valor_frete: z.string().optional(),
   data_carregamento: z.string().min(1, 'Obrigatório'),
   data_entrega_prevista: z.string().nullable().optional(),
@@ -49,29 +49,24 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
     enabled: open,
   })
 
-  const { data: motoristas = [] } = useQuery<Tables<'motoristas'>[]>({
-    queryKey: ['motoristas'],
-    queryFn: () => fetch('/api/motoristas').then(r => r.json()),
-    enabled: open,
-  })
-
-  const { data: veiculos = [] } = useQuery<Tables<'veiculos'>[]>({
-    queryKey: ['veiculos'],
-    queryFn: () => fetch('/api/veiculos').then(r => r.json()),
-    enabled: open,
+  const { data: proximoNumero } = useQuery<{ numero: string }>({
+    queryKey: ['fretes-proximo-numero'],
+    queryFn: () => fetch('/api/fretes/proximo-numero').then(r => r.json()),
+    enabled: open && !isEditing,
+    staleTime: 0,
   })
 
   const form = useForm<FreteFormData>({
     resolver: zodResolver(FreteSchema),
     defaultValues: {
+      numero_frete: '',
       origem_cidade: '',
       origem_uf: '',
       destino_cidade: '',
       destino_uf: '',
       cliente_id: undefined,
-      motorista_id: '',
-      veiculo_id: '',
-      tipo_veiculo: undefined,
+      tipo_produto: undefined,
+      valor_mercadoria: '',
       valor_frete: '',
       data_carregamento: '',
       data_entrega_prevista: undefined,
@@ -79,12 +74,25 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
     },
   })
 
+  useEffect(() => {
+    if (!open) {
+      form.reset()
+    }
+  }, [open, form])
+
+  useEffect(() => {
+    if (proximoNumero?.numero && !isEditing && !form.getValues('numero_frete')) {
+      form.setValue('numero_frete', proximoNumero.numero)
+    }
+  }, [proximoNumero, isEditing, form])
+
   const mutation = useMutation({
     mutationFn: async (data: FreteFormData) => {
       const url = isEditing ? `/api/fretes/${freteId}` : '/api/fretes'
       const method = isEditing ? 'PATCH' : 'POST'
       const payload = {
         ...data,
+        valor_mercadoria: data.valor_mercadoria ? parseFloat(data.valor_mercadoria) : null,
         valor_frete: data.valor_frete ? parseFloat(data.valor_frete) : null,
       }
       const res = await fetch(url, {
@@ -100,6 +108,7 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fretes'] })
+      queryClient.invalidateQueries({ queryKey: ['fretes-proximo-numero'] })
       toast.success(isEditing ? 'Frete atualizado' : 'Frete criado com sucesso')
       form.reset()
       onClose()
@@ -108,10 +117,6 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
       toast.error(err.message)
     },
   })
-
-  useEffect(() => {
-    if (!open) form.reset()
-  }, [open, form])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -122,18 +127,33 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+            {/* Número do Frete — primeiro campo */}
+            <FormField control={form.control} name="numero_frete" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Número do Frete *</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="F-0001"
+                    className="font-mono font-semibold text-base"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             {/* Origem / Destino */}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="origem_cidade" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cidade Origem</FormLabel>
+                  <FormLabel>Cidade Origem *</FormLabel>
                   <FormControl><Input placeholder="São Paulo" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="origem_uf" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>UF Origem</FormLabel>
+                  <FormLabel>UF Origem *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger></FormControl>
                     <SelectContent>
@@ -145,14 +165,14 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
               )} />
               <FormField control={form.control} name="destino_cidade" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cidade Destino</FormLabel>
+                  <FormLabel>Cidade Destino *</FormLabel>
                   <FormControl><Input placeholder="Rio de Janeiro" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="destino_uf" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>UF Destino</FormLabel>
+                  <FormLabel>UF Destino *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger></FormControl>
                     <SelectContent>
@@ -178,39 +198,60 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
               </FormItem>
             )} />
 
-            {/* Motorista / Veículo */}
+            {/* Tipo de Produto */}
+            <FormField control={form.control} name="tipo_produto" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo de Produto</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Ex: Grãos, Carga Seca, Frigorificado..."
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Valores */}
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="motorista_id" render={({ field }) => (
+              <FormField control={form.control} name="valor_mercadoria" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Motorista *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value ?? undefined}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {motoristas.filter(m => m.status === 'ATIVO').map(m =>
-                        <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Valor da Mercadoria (R$)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0,00"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={e => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="veiculo_id" render={({ field }) => (
+              <FormField control={form.control} name="valor_frete" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Veículo *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value ?? undefined}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {veiculos.map(v =>
-                        <SelectItem key={v.id} value={v.id}>{v.placa} — {v.tipo}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Valor do Frete (R$)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0,00"
+                      {...field}
+                      value={field.value ?? ''}
+                      onChange={e => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
 
-            {/* Datas / Valor */}
+            {/* Datas */}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="data_carregamento" render={({ field }) => (
                 <FormItem>
@@ -227,24 +268,6 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
                 </FormItem>
               )} />
             </div>
-
-            <FormField control={form.control} name="valor_frete" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Valor do Frete (opcional)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="0,00"
-                    {...field}
-                    value={field.value ?? ''}
-                    onChange={e => field.onChange(e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
 
             <FormField control={form.control} name="observacoes" render={({ field }) => (
               <FormItem>

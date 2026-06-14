@@ -2,19 +2,19 @@ import type { Tables } from '@/types/database.types'
 
 export type FreteComRelacoes = Tables<'fretes'> & {
   clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
-  motoristas: Pick<Tables<'motoristas'>, 'nome'> | null
-  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo'> | null
+  motoristas: Pick<Tables<'motoristas'>, 'nome' | 'cnh' | 'validade_cnh' | 'banco' | 'agencia_conta' | 'chave_pix'> | null
+  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo' | 'banco_proprietario' | 'agencia_conta_proprietario' | 'chave_pix_proprietario'> | null
 }
 
 export type FreteCreatePayload = {
+  numero_frete: string
   cliente_id?: string | null
-  motorista_id?: string | null
-  veiculo_id?: string | null
   origem_cidade: string
   origem_uf: string
   destino_cidade: string
   destino_uf: string
-  tipo_veiculo?: string | null
+  tipo_produto?: string | null
+  valor_mercadoria?: number | null
   valor_frete?: number | null
   data_carregamento?: string | null
   data_entrega_prevista?: string | null
@@ -26,6 +26,13 @@ export type FreteUpdatePayload = Partial<FreteCreatePayload>
 export type FreteStatusPayload = {
   status: Tables<'fretes'>['status']
   motivo_cancelamento?: string
+  motorista_id?: string
+  veiculo_id?: string
+  numero_gr?: string
+  chave_cte?: string
+  numero_contrato?: string
+  numero_ciot?: string
+  valor_adiantamento?: number
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -63,5 +70,4 @@ export const fretesService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).then((r) => handleResponse(r)),
-
 }

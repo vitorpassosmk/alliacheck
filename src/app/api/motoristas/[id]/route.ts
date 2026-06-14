@@ -6,17 +6,14 @@ const MotoristaUpdateSchema = z.object({
   nome: z.string().min(1).optional(),
   cpf: z.string().min(11).optional(),
   cnh: z.string().min(1).optional(),
-  categoria_cnh: z.string().nullable().optional(),
   validade_cnh: z.string().optional(),
-  rntrc: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
   status: z.enum(['ATIVO', 'INATIVO', 'BLOQUEADO']).optional(),
+  tipo_motorista: z.enum(['FROTA', 'AGREGADO']).nullable().optional(),
+  banco: z.string().nullable().optional(),
+  agencia_conta: z.string().nullable().optional(),
+  chave_pix: z.string().nullable().optional(),
 })
-
-async function checkAdminOrSupervisor(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase.from('users').select('papel').eq('id', userId).single()
-  return data && ['ADMIN', 'SUPERVISOR'].includes(data.papel)
-}
 
 export async function PATCH(
   request: Request,
@@ -29,9 +26,6 @@ export async function PATCH(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-  if (!await checkAdminOrSupervisor(supabase, user.id)) {
-    return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
-  }
 
   const body = await request.json()
   const parsed = MotoristaUpdateSchema.safeParse(body)
@@ -58,7 +52,9 @@ export async function DELETE(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
-  if (!await checkAdminOrSupervisor(supabase, user.id)) {
+
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
     return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
   }
 

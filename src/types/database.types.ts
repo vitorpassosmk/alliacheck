@@ -80,6 +80,10 @@ export type Database = {
           rntrc: string | null
           telefone: string | null
           status: 'ATIVO' | 'INATIVO' | 'BLOQUEADO'
+          tipo_motorista: 'FROTA' | 'AGREGADO' | null
+          banco: string | null
+          agencia_conta: string | null
+          chave_pix: string | null
           criado_em: string
         }
         Insert: {
@@ -92,6 +96,10 @@ export type Database = {
           rntrc?: string | null
           telefone?: string | null
           status?: 'ATIVO' | 'INATIVO' | 'BLOQUEADO'
+          tipo_motorista?: 'FROTA' | 'AGREGADO' | null
+          banco?: string | null
+          agencia_conta?: string | null
+          chave_pix?: string | null
           criado_em?: string
         }
         Update: {
@@ -104,6 +112,10 @@ export type Database = {
           rntrc?: string | null
           telefone?: string | null
           status?: 'ATIVO' | 'INATIVO' | 'BLOQUEADO'
+          tipo_motorista?: 'FROTA' | 'AGREGADO' | null
+          banco?: string | null
+          agencia_conta?: string | null
+          chave_pix?: string | null
           criado_em?: string
         }
         Relationships: []
@@ -112,52 +124,80 @@ export type Database = {
         Row: {
           id: string
           placa: string
-          tipo: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'BITREM'
+          tipo: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'CARRETA_LS' | 'BITREM'
           modelo: string | null
           ano: number | null
           proprietario: string | null
           rntrc: string | null
           ativo: boolean
+          tipo_veiculo: 'FROTA' | 'AGREGADO' | null
+          tem_placas_separadas: boolean
+          placa_carreta: string | null
+          cpf_proprietario: string | null
+          banco_proprietario: string | null
+          agencia_conta_proprietario: string | null
+          chave_pix_proprietario: string | null
         }
         Insert: {
           id?: string
           placa: string
-          tipo: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'BITREM'
+          tipo: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'CARRETA_LS' | 'BITREM'
           modelo?: string | null
           ano?: number | null
           proprietario?: string | null
           rntrc?: string | null
           ativo?: boolean
+          tipo_veiculo?: 'FROTA' | 'AGREGADO' | null
+          tem_placas_separadas?: boolean
+          placa_carreta?: string | null
+          cpf_proprietario?: string | null
+          banco_proprietario?: string | null
+          agencia_conta_proprietario?: string | null
+          chave_pix_proprietario?: string | null
         }
         Update: {
           id?: string
           placa?: string
-          tipo?: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'BITREM'
+          tipo?: 'VAN' | 'TOCO' | 'TRUCK' | 'BITRUCK' | 'CARRETA' | 'CARRETA_LS' | 'BITREM'
           modelo?: string | null
           ano?: number | null
           proprietario?: string | null
           rntrc?: string | null
           ativo?: boolean
+          tipo_veiculo?: 'FROTA' | 'AGREGADO' | null
+          tem_placas_separadas?: boolean
+          placa_carreta?: string | null
+          cpf_proprietario?: string | null
+          banco_proprietario?: string | null
+          agencia_conta_proprietario?: string | null
+          chave_pix_proprietario?: string | null
         }
         Relationships: []
       }
       fretes: {
         Row: {
           id: string
+          numero_frete: string
           cliente_id: string | null
           motorista_id: string | null
           veiculo_id: string | null
-          status: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'CTE_EMITIDO' | 'AGUARDANDO_LIBERACAO' | 'EM_VIAGEM' | 'CONCLUIDA' | 'CANCELADO'
           chave_cte: string | null
           origem_cidade: string
           origem_uf: string
           destino_cidade: string
           destino_uf: string
           tipo_veiculo: string | null
+          tipo_produto: string | null
           valor_frete: number | null
+          valor_mercadoria: number | null
           data_carregamento: string | null
           data_entrega_prevista: string | null
           data_entrega_real: string | null
+          numero_gr: string | null
+          numero_contrato: string | null
+          numero_ciot: string | null
+          valor_adiantamento: number | null
           observacoes: string | null
           criado_por: string | null
           criado_em: string
@@ -165,20 +205,27 @@ export type Database = {
         }
         Insert: {
           id?: string
+          numero_frete: string
           cliente_id?: string | null
           motorista_id?: string | null
           veiculo_id?: string | null
-          status?: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status?: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'CTE_EMITIDO' | 'AGUARDANDO_LIBERACAO' | 'EM_VIAGEM' | 'CONCLUIDA' | 'CANCELADO'
           chave_cte?: string | null
           origem_cidade: string
           origem_uf: string
           destino_cidade: string
           destino_uf: string
           tipo_veiculo?: string | null
+          tipo_produto?: string | null
           valor_frete?: number | null
+          valor_mercadoria?: number | null
           data_carregamento?: string | null
           data_entrega_prevista?: string | null
           data_entrega_real?: string | null
+          numero_gr?: string | null
+          numero_contrato?: string | null
+          numero_ciot?: string | null
+          valor_adiantamento?: number | null
           observacoes?: string | null
           criado_por?: string | null
           criado_em?: string
@@ -186,20 +233,27 @@ export type Database = {
         }
         Update: {
           id?: string
+          numero_frete?: string
           cliente_id?: string | null
           motorista_id?: string | null
           veiculo_id?: string | null
-          status?: 'ABERTO' | 'CARREGANDO' | 'AGUARDANDO_CTE' | 'CTE_EMITIDO' | 'EM_VIAGEM' | 'FINALIZADO' | 'CANCELADO'
+          status?: 'ABERTO' | 'PROGRAMADO' | 'CARREGANDO' | 'CTE_EMITIDO' | 'AGUARDANDO_LIBERACAO' | 'EM_VIAGEM' | 'CONCLUIDA' | 'CANCELADO'
           chave_cte?: string | null
           origem_cidade?: string
           origem_uf?: string
           destino_cidade?: string
           destino_uf?: string
           tipo_veiculo?: string | null
+          tipo_produto?: string | null
           valor_frete?: number | null
+          valor_mercadoria?: number | null
           data_carregamento?: string | null
           data_entrega_prevista?: string | null
           data_entrega_real?: string | null
+          numero_gr?: string | null
+          numero_contrato?: string | null
+          numero_ciot?: string | null
+          valor_adiantamento?: number | null
           observacoes?: string | null
           criado_por?: string | null
           criado_em?: string

@@ -19,11 +19,12 @@ type StatusViagem = Tables<'fretes'>['status'] | 'TODOS'
 const STATUS_OPTIONS: { value: StatusViagem; label: string }[] = [
   { value: 'TODOS', label: 'Todos os status' },
   { value: 'ABERTO', label: 'Aberto' },
+  { value: 'PROGRAMADO', label: 'Programado' },
   { value: 'CARREGANDO', label: 'Carregando' },
-  { value: 'AGUARDANDO_CTE', label: 'Aguard. CT-e' },
   { value: 'CTE_EMITIDO', label: 'CT-e Emitido' },
+  { value: 'AGUARDANDO_LIBERACAO', label: 'Aguard. Liberação' },
   { value: 'EM_VIAGEM', label: 'Em Viagem' },
-  { value: 'FINALIZADO', label: 'Finalizado' },
+  { value: 'CONCLUIDA', label: 'Concluída' },
   { value: 'CANCELADO', label: 'Cancelado' },
 ]
 

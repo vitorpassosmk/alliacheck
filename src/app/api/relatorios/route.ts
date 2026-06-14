@@ -29,10 +29,10 @@ export async function GET(request: Request) {
   if (error) return Response.json({ error: error.message }, { status: 500 })
 
   const total = fretes.length
-  const finalizados = fretes.filter((f) => f.status === 'FINALIZADO').length
+  const finalizados = fretes.filter((f) => f.status === 'CONCLUIDA').length
   const cancelados = fretes.filter((f) => f.status === 'CANCELADO').length
   const emAndamento = fretes.filter((f) =>
-    ['ABERTO', 'CARREGANDO', 'AGUARDANDO_CTE', 'CTE_EMITIDO', 'EM_VIAGEM'].includes(f.status)
+    ['ABERTO', 'PROGRAMADO', 'CARREGANDO', 'CTE_EMITIDO', 'AGUARDANDO_LIBERACAO', 'EM_VIAGEM'].includes(f.status)
   ).length
   const valorTotal = fretes.reduce((acc, f) => acc + (f.valor_frete ?? 0), 0)
   const porStatus = fretes.reduce(

@@ -2,17 +2,19 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const FreteCreateSchema = z.object({
+  numero_frete: z.string().min(1),
   cliente_id: z.string().uuid().nullable().optional(),
   origem_cidade: z.string().min(1),
   origem_uf: z.string().length(2),
   destino_cidade: z.string().min(1),
   destino_uf: z.string().length(2),
-  tipo_veiculo: z.string().optional().nullable(),
+  tipo_produto: z.string().optional().nullable(),
+  valor_mercadoria: z.number().positive().optional().nullable(),
   valor_frete: z.number().positive().optional().nullable(),
   data_carregamento: z.string().min(1),
   data_entrega_prevista: z.string().optional().nullable(),
-  motorista_id: z.string().uuid(),
-  veiculo_id: z.string().uuid(),
+  motorista_id: z.string().uuid().optional().nullable(),
+  veiculo_id: z.string().uuid().optional().nullable(),
   observacoes: z.string().optional().nullable(),
 })
 
@@ -23,7 +25,12 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('fretes')
-    .select(`*, clientes(razao_social), motoristas(nome), veiculos(placa, tipo)`)
+    .select(`
+      *,
+      clientes(razao_social),
+      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
+      veiculos(placa, tipo, placa_carreta, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+    `)
     .order('criado_em', { ascending: false })
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
@@ -54,12 +61,17 @@ export async function POST(request: Request) {
     .select()
     .single()
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error) {
+    if (error.code === '23505') {
+      return Response.json({ error: `O número de frete '${parsed.data.numero_frete}' já está em uso` }, { status: 409 })
+    }
+    return Response.json({ error: error.message }, { status: 500 })
+  }
 
   await supabase.from('eventos').insert({
     frete_id: data.id,
     tipo: 'FRETE_CRIADO',
-    descricao: 'Frete criado',
+    descricao: `Frete ${data.numero_frete} criado`,
     status_novo: 'ABERTO',
     usuario_id: user.id,
     ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),

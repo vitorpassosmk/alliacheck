@@ -1,20 +1,22 @@
 export type StatusViagem =
   | 'ABERTO'
+  | 'PROGRAMADO'
   | 'CARREGANDO'
-  | 'AGUARDANDO_CTE'
   | 'CTE_EMITIDO'
+  | 'AGUARDANDO_LIBERACAO'
   | 'EM_VIAGEM'
-  | 'FINALIZADO'
+  | 'CONCLUIDA'
   | 'CANCELADO'
 
 export const TRANSICOES_VIAGEM: Record<StatusViagem, StatusViagem[]> = {
-  ABERTO:        ['CARREGANDO', 'CANCELADO'],
-  CARREGANDO:    ['AGUARDANDO_CTE', 'CANCELADO'],
-  AGUARDANDO_CTE: ['CTE_EMITIDO', 'CANCELADO'],
-  CTE_EMITIDO:   ['EM_VIAGEM', 'CANCELADO'],
-  EM_VIAGEM:     ['FINALIZADO'],
-  FINALIZADO:    [],
-  CANCELADO:     [],
+  ABERTO:               ['PROGRAMADO', 'CANCELADO'],
+  PROGRAMADO:           ['CARREGANDO', 'CANCELADO'],
+  CARREGANDO:           ['CTE_EMITIDO', 'CANCELADO'],
+  CTE_EMITIDO:          ['AGUARDANDO_LIBERACAO', 'CANCELADO'],
+  AGUARDANDO_LIBERACAO: ['EM_VIAGEM', 'CANCELADO'],
+  EM_VIAGEM:            ['CONCLUIDA'],
+  CONCLUIDA:            [],
+  CANCELADO:            [],
 }
 
 export function validarTransicao(atual: StatusViagem, novo: StatusViagem): boolean {
@@ -23,9 +25,10 @@ export function validarTransicao(atual: StatusViagem, novo: StatusViagem): boole
 
 export const COLUNAS_KANBAN: StatusViagem[] = [
   'ABERTO',
+  'PROGRAMADO',
   'CARREGANDO',
-  'AGUARDANDO_CTE',
   'CTE_EMITIDO',
+  'AGUARDANDO_LIBERACAO',
   'EM_VIAGEM',
-  'FINALIZADO',
+  'CONCLUIDA',
 ]

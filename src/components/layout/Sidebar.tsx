@@ -14,6 +14,7 @@ import {
   Package,
   BarChart3,
   UserCog,
+  Banknote,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { href: '/motoristas', label: 'Motoristas', icon: Users },
   { href: '/veiculos', label: 'Veículos', icon: Truck },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
+  { href: '/pagamentos', label: 'Pagamentos', icon: Banknote },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
   { href: '/usuarios', label: 'Usuários', icon: UserCog, somente: ['ADMIN'] },
 ]

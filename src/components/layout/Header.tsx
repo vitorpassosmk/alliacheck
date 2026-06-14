@@ -38,8 +38,10 @@ export function Header() {
     <header className="h-14 border-b flex items-center justify-between px-4 bg-background shrink-0">
       {/* Mobile menu */}
       <Sheet>
-        <SheetTrigger render={<Button variant="ghost" size="icon" className="md:hidden" />}>
-          <Menu className="h-5 w-5" />
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" className="md:hidden">
+            <Menu className="h-5 w-5" />
+          </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64">
           <Sidebar />
