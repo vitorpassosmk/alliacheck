@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { EventTimeline } from '@/components/eventos/EventTimeline'
+import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
+import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2 } from 'lucide-react'
 import type { Tables } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
 
@@ -47,6 +49,26 @@ interface FreteDetailModalProps {
   onClose: () => void
 }
 
+// ─── Verificação de senha via Supabase ───────────────────────────────────────
+
+async function verificarSenha(senha: string): Promise<boolean> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return false
+  const { error } = await supabase.auth.signInWithPassword({ email: user.email, password: senha })
+  return !error
+}
+
+async function buscarPapelUsuario(): Promise<string | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  return data?.papel ?? null
+}
+
+// ─── Modal principal ──────────────────────────────────────────────────────────
+
 export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalProps) {
   const queryClient = useQueryClient()
   const [cancelando, setCancelando] = useState(false)
@@ -67,21 +89,40 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [numeroCiot, setNumeroCiot] = useState('')
   const [valorAdiantamento, setValorAdiantamento] = useState('')
 
+  // Diálogo de senha — liberação EM_VIAGEM
+  const [senhaLiberacaoAberta, setSenhaLiberacaoAberta] = useState(false)
+  const [loadingLiberacao, setLoadingLiberacao] = useState(false)
+
+  // Diálogo de senha — exclusão
+  const [senhaExclusaoAberta, setSenhaExclusaoAberta] = useState(false)
+  const [loadingExclusao, setLoadingExclusao] = useState(false)
+
   const { data: frete, isLoading } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
     queryFn: () => fetch(`/api/fretes/${freteId}`).then(r => r.json()),
     enabled: open,
   })
 
+  const { data: papel } = useQuery<string | null>({
+    queryKey: ['usuario-papel'],
+    queryFn: buscarPapelUsuario,
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const usarDisponiveis = frete?.status === 'ABERTO'
+
   const { data: motoristas = [] } = useQuery<Tables<'motoristas'>[]>({
-    queryKey: ['motoristas'],
-    queryFn: () => fetch('/api/motoristas').then(r => r.json()),
+    queryKey: usarDisponiveis ? ['motoristas-disponiveis'] : ['motoristas'],
+    queryFn: () =>
+      fetch(usarDisponiveis ? '/api/motoristas/disponiveis' : '/api/motoristas').then(r => r.json()),
     enabled: open && frete?.status === 'ABERTO',
   })
 
   const { data: veiculos = [] } = useQuery<Tables<'veiculos'>[]>({
-    queryKey: ['veiculos'],
-    queryFn: () => fetch('/api/veiculos').then(r => r.json()),
+    queryKey: usarDisponiveis ? ['veiculos-disponiveis'] : ['veiculos'],
+    queryFn: () =>
+      fetch(usarDisponiveis ? '/api/veiculos/disponiveis' : '/api/veiculos').then(r => r.json()),
     enabled: open && frete?.status === 'ABERTO',
   })
 
@@ -151,177 +192,269 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     onError: (e: Error) => toast.error(e.message),
   })
 
+  // ─── Handlers de senha ──────────────────────────────────────────────────────
+
+  async function handleConfirmarLiberacao(senha: string) {
+    setLoadingLiberacao(true)
+    try {
+      const ok = await verificarSenha(senha)
+      if (!ok) {
+        toast.error('Senha incorreta. Liberação cancelada.')
+        return
+      }
+      setSenhaLiberacaoAberta(false)
+      avancarStatus.mutate('EM_VIAGEM')
+    } catch {
+      toast.error('Erro ao verificar senha.')
+    } finally {
+      setLoadingLiberacao(false)
+    }
+  }
+
+  async function handleConfirmarExclusao(senha: string) {
+    setLoadingExclusao(true)
+    try {
+      const ok = await verificarSenha(senha)
+      if (!ok) {
+        toast.error('Senha incorreta. Exclusão cancelada.')
+        return
+      }
+      const res = await fetch(`/api/fretes/${freteId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast.error(json.error ?? 'Erro ao excluir frete.')
+        return
+      }
+      toast.success('Frete excluído com sucesso.')
+      setSenhaExclusaoAberta(false)
+      queryClient.invalidateQueries({ queryKey: ['fretes'] })
+      onClose()
+    } catch {
+      toast.error('Erro ao excluir frete.')
+    } finally {
+      setLoadingExclusao(false)
+    }
+  }
+
   const proximos = frete ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO') : []
   const nextStatus = proximos[0] as StatusViagem | undefined
   const podeCancelar = frete && !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
+  const podeExcluir =
+    papel === 'ADMIN' &&
+    frete !== undefined &&
+    !['EM_VIAGEM', 'CONCLUIDA'].includes(frete?.status ?? '')
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        {isLoading || !frete ? (
-          <div className="space-y-4 p-2">
-            <DialogTitle className="sr-only">Carregando frete...</DialogTitle>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-24 rounded-lg" />
-            <Skeleton className="h-48 rounded-lg" />
-          </div>
-        ) : (
-          <>
-            <DialogHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <DialogTitle className="flex items-center gap-2">
-                    Frete {frete.numero_frete}
-                    <StatusBadge status={frete.status as StatusViagem} />
-                  </DialogTitle>
-                  {frete.clientes && (
-                    <span className="text-sm text-muted-foreground">{frete.clientes.razao_social}</span>
+    <>
+      <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {isLoading || !frete ? (
+            <div className="space-y-4 p-2">
+              <DialogTitle className="sr-only">Carregando frete...</DialogTitle>
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-24 rounded-lg" />
+              <Skeleton className="h-48 rounded-lg" />
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <DialogTitle className="flex items-center gap-2">
+                      Frete {frete.numero_frete}
+                      <StatusBadge status={frete.status as StatusViagem} />
+                    </DialogTitle>
+                    {frete.clientes && (
+                      <span className="text-sm text-muted-foreground">{frete.clientes.razao_social}</span>
+                    )}
+                  </div>
+                </div>
+              </DialogHeader>
+
+              {/* Ações de status */}
+              {frete.status !== 'CONCLUIDA' && frete.status !== 'CANCELADO' && (
+                <div className="flex flex-col gap-3 p-4 bg-muted/40 rounded-lg border">
+                  <TransitionForm
+                    status={frete.status as StatusViagem}
+                    nextStatus={nextStatus}
+                    isPending={avancarStatus.isPending}
+                    onAvancar={(status) => {
+                      if (status === 'EM_VIAGEM') {
+                        setSenhaLiberacaoAberta(true)
+                        return
+                      }
+                      avancarStatus.mutate(status)
+                    }}
+                    // PROGRAMADO
+                    motoristas={motoristas}
+                    veiculos={veiculos}
+                    usarDisponiveis={usarDisponiveis}
+                    motoristaId={motoristaId}
+                    setMotoristaId={setMotoristaId}
+                    veiculoId={veiculoId}
+                    setVeiculoId={setVeiculoId}
+                    // CARREGANDO
+                    numeroGr={numeroGr}
+                    setNumeroGr={setNumeroGr}
+                    // CTE_EMITIDO
+                    chaveCte={chaveCte}
+                    setChaveCte={(v) => { setChaveCte(v); setChaveCteError('') }}
+                    chaveCteError={chaveCteError}
+                    // AGUARDANDO_LIBERACAO
+                    numeroContrato={numeroContrato}
+                    setNumeroContrato={setNumeroContrato}
+                    numeroCiot={numeroCiot}
+                    setNumeroCiot={setNumeroCiot}
+                    valorAdiantamento={valorAdiantamento}
+                    setValorAdiantamento={setValorAdiantamento}
+                  />
+                  {podeCancelar && !cancelando && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-fit text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={() => setCancelando(true)}
+                    >
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Cancelar Frete
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {cancelando && (
+                <CancelForm
+                  onConfirm={(motivo) => cancelar.mutate(motivo)}
+                  onCancel={() => setCancelando(false)}
+                  loading={cancelar.isPending}
+                />
+              )}
+
+              {/* Painel expandido para AGUARDANDO_LIBERACAO */}
+              {frete.status === 'AGUARDANDO_LIBERACAO' && (
+                <LiberacaoPanel frete={frete} />
+              )}
+
+              {/* Informações do frete */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground col-span-2">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span>{frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}</span>
+                  </div>
+                  <div className="text-muted-foreground col-span-2">
+                    <span className="font-medium">Produto: </span>
+                    {frete.tipo_produto ?? <span className="italic text-muted-foreground/60">—</span>}
+                  </div>
+                  <div className="text-muted-foreground col-span-2">
+                    <span className="font-medium">Valor da carga: </span>
+                    {frete.valor_mercadoria
+                      ? `R$ ${frete.valor_mercadoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      : <span className="italic text-muted-foreground/60">—</span>}
+                  </div>
+                  {frete.motoristas && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <User className="h-4 w-4 shrink-0" />
+                      <span>{frete.motoristas.nome}</span>
+                    </div>
+                  )}
+                  {frete.veiculos && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Truck className="h-4 w-4 shrink-0" />
+                      <span>{frete.veiculos.placa} — {frete.veiculos.tipo}</span>
+                    </div>
+                  )}
+                  {frete.data_carregamento && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="h-4 w-4 shrink-0" />
+                      <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  )}
+                  {frete.valor_frete && (
+                    <div className="text-muted-foreground">
+                      Frete: R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  {frete.numero_gr && (
+                    <div className="text-muted-foreground">
+                      <span className="font-medium">N° GR: </span>{frete.numero_gr}
+                    </div>
+                  )}
+                  {frete.numero_contrato && (
+                    <div className="text-muted-foreground">
+                      <span className="font-medium">N° Contrato: </span>{frete.numero_contrato}
+                    </div>
+                  )}
+                  {frete.numero_ciot && (
+                    <div className="text-muted-foreground">
+                      <span className="font-medium">CIOT: </span>{frete.numero_ciot}
+                    </div>
+                  )}
+                  {frete.valor_adiantamento && (
+                    <div className="text-muted-foreground">
+                      Adiantamento: R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  {frete.chave_cte && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Chave CT-e: </span>
+                      <span className="font-mono text-xs break-all">{frete.chave_cte}</span>
+                    </div>
+                  )}
+                  {frete.observacoes && (
+                    <div className="col-span-2 text-muted-foreground">
+                      <span className="font-medium">Obs: </span>{frete.observacoes}
+                    </div>
                   )}
                 </div>
               </div>
-            </DialogHeader>
 
-            {/* Ações de status */}
-            {frete.status !== 'CONCLUIDA' && frete.status !== 'CANCELADO' && (
-              <div className="flex flex-col gap-3 p-4 bg-muted/40 rounded-lg border">
-                <TransitionForm
-                  status={frete.status as StatusViagem}
-                  nextStatus={nextStatus}
-                  isPending={avancarStatus.isPending}
-                  onAvancar={(status) => avancarStatus.mutate(status)}
-                  // PROGRAMADO
-                  motoristas={motoristas}
-                  veiculos={veiculos}
-                  motoristaId={motoristaId}
-                  setMotoristaId={setMotoristaId}
-                  veiculoId={veiculoId}
-                  setVeiculoId={setVeiculoId}
-                  // CARREGANDO
-                  numeroGr={numeroGr}
-                  setNumeroGr={setNumeroGr}
-                  // CTE_EMITIDO
-                  chaveCte={chaveCte}
-                  setChaveCte={(v) => { setChaveCte(v); setChaveCteError('') }}
-                  chaveCteError={chaveCteError}
-                  // AGUARDANDO_LIBERACAO
-                  numeroContrato={numeroContrato}
-                  setNumeroContrato={setNumeroContrato}
-                  numeroCiot={numeroCiot}
-                  setNumeroCiot={setNumeroCiot}
-                  valorAdiantamento={valorAdiantamento}
-                  setValorAdiantamento={setValorAdiantamento}
-                />
-                {podeCancelar && !cancelando && (
+              {/* Histórico */}
+              <div className="space-y-3 pt-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Histórico</h3>
+                <EventTimeline eventos={frete.eventos ?? []} />
+              </div>
+
+              {/* Rodapé — botão Excluir (ADMIN only) */}
+              {podeExcluir && (
+                <div className="pt-2 border-t flex justify-start">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="w-fit text-destructive border-destructive/30 hover:bg-destructive/10"
-                    onClick={() => setCancelando(true)}
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setSenhaExclusaoAberta(true)}
                   >
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Cancelar Frete
+                    <Trash2 className="h-4 w-4 mr-1.5" />
+                    Excluir frete
                   </Button>
-                )}
-              </div>
-            )}
-
-            {cancelando && (
-              <CancelForm
-                onConfirm={(motivo) => cancelar.mutate(motivo)}
-                onCancel={() => setCancelando(false)}
-                loading={cancelar.isPending}
-              />
-            )}
-
-            {/* Painel expandido para AGUARDANDO_LIBERACAO */}
-            {frete.status === 'AGUARDANDO_LIBERACAO' && (
-              <LiberacaoPanel frete={frete} />
-            )}
-
-            {/* Informações do frete */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Informações</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground col-span-2">
-                  <MapPin className="h-4 w-4 shrink-0" />
-                  <span>{frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}</span>
                 </div>
-                <div className="text-muted-foreground col-span-2">
-                  <span className="font-medium">Produto: </span>
-                  {frete.tipo_produto ?? <span className="italic text-muted-foreground/60">—</span>}
-                </div>
-                <div className="text-muted-foreground col-span-2">
-                  <span className="font-medium">Valor da carga: </span>
-                  {frete.valor_mercadoria
-                    ? `R$ ${frete.valor_mercadoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : <span className="italic text-muted-foreground/60">—</span>}
-                </div>
-                {frete.motoristas && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <User className="h-4 w-4 shrink-0" />
-                    <span>{frete.motoristas.nome}</span>
-                  </div>
-                )}
-                {frete.veiculos && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Truck className="h-4 w-4 shrink-0" />
-                    <span>{frete.veiculos.placa} — {frete.veiculos.tipo}</span>
-                  </div>
-                )}
-                {frete.data_carregamento && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4 shrink-0" />
-                    <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                  </div>
-                )}
-                {frete.valor_frete && (
-                  <div className="text-muted-foreground">
-                    Frete: R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                )}
-                {frete.numero_gr && (
-                  <div className="text-muted-foreground">
-                    <span className="font-medium">N° GR: </span>{frete.numero_gr}
-                  </div>
-                )}
-                {frete.numero_contrato && (
-                  <div className="text-muted-foreground">
-                    <span className="font-medium">N° Contrato: </span>{frete.numero_contrato}
-                  </div>
-                )}
-                {frete.numero_ciot && (
-                  <div className="text-muted-foreground">
-                    <span className="font-medium">CIOT: </span>{frete.numero_ciot}
-                  </div>
-                )}
-                {frete.valor_adiantamento && (
-                  <div className="text-muted-foreground">
-                    Adiantamento: R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </div>
-                )}
-                {frete.chave_cte && (
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">Chave CT-e: </span>
-                    <span className="font-mono text-xs break-all">{frete.chave_cte}</span>
-                  </div>
-                )}
-                {frete.observacoes && (
-                  <div className="col-span-2 text-muted-foreground">
-                    <span className="font-medium">Obs: </span>{frete.observacoes}
-                  </div>
-                )}
-              </div>
-            </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
-            {/* Histórico */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Histórico</h3>
-              <EventTimeline eventos={frete.eventos ?? []} />
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+      {/* Diálogo de senha — liberação EM_VIAGEM */}
+      <PasswordConfirmDialog
+        open={senhaLiberacaoAberta}
+        onOpenChange={setSenhaLiberacaoAberta}
+        onConfirm={handleConfirmarLiberacao}
+        loading={loadingLiberacao}
+        title="Confirmar Liberação"
+        description="Digite sua senha para liberar o frete para EM VIAGEM"
+      />
+
+      {/* Diálogo de senha — exclusão */}
+      <PasswordConfirmDialog
+        open={senhaExclusaoAberta}
+        onOpenChange={setSenhaExclusaoAberta}
+        onConfirm={handleConfirmarExclusao}
+        loading={loadingExclusao}
+        title="Excluir Frete"
+        description="Esta ação é irreversível. Digite sua senha para confirmar."
+      />
+    </>
   )
 }
 
@@ -334,6 +467,7 @@ interface TransitionFormProps {
   onAvancar: (status: StatusViagem) => void
   motoristas: Tables<'motoristas'>[]
   veiculos: Tables<'veiculos'>[]
+  usarDisponiveis: boolean
   motoristaId: string
   setMotoristaId: (v: string) => void
   veiculoId: string
@@ -353,7 +487,7 @@ interface TransitionFormProps {
 
 function TransitionForm({
   status, nextStatus, isPending, onAvancar,
-  motoristas, veiculos, motoristaId, setMotoristaId, veiculoId, setVeiculoId,
+  motoristas, veiculos, usarDisponiveis, motoristaId, setMotoristaId, veiculoId, setVeiculoId,
   numeroGr, setNumeroGr,
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
@@ -367,7 +501,9 @@ function TransitionForm({
         <p className="text-sm font-medium">Selecione motorista e veículo para programar o frete</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Motorista *</label>
+            <label className="text-xs text-muted-foreground">
+              Motorista *{usarDisponiveis && <span className="ml-1 text-muted-foreground/70">(disponíveis)</span>}
+            </label>
             <Select onValueChange={setMotoristaId} value={motoristaId}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
@@ -378,7 +514,9 @@ function TransitionForm({
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Veículo *</label>
+            <label className="text-xs text-muted-foreground">
+              Veículo *{usarDisponiveis && <span className="ml-1 text-muted-foreground/70">(disponíveis)</span>}
+            </label>
             <Select onValueChange={setVeiculoId} value={veiculoId}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
@@ -494,7 +632,7 @@ function TransitionForm({
         onClick={() => onAvancar('EM_VIAGEM')}
         disabled={isPending}
       >
-        ✓ Pagamento Realizado — Liberar para Viagem
+        Pagamento Realizado — Liberar para Viagem
       </Button>
     )
   }

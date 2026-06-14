@@ -56,11 +56,22 @@ export default function FretesPage() {
   const [novoFreteOpen, setNovoFreteOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<StatusViagem>('TODOS')
+  const [dataInicio, setDataInicio] = useState('')
+  const [dataFim, setDataFim] = useState('')
+
+  function limparFiltros() {
+    setBusca('')
+    setStatusFiltro('TODOS')
+    setDataInicio('')
+    setDataFim('')
+  }
 
   const fretefiltrados = useMemo(() => {
     if (!fretes) return []
     return fretes.filter((f) => {
       if (statusFiltro !== 'TODOS' && f.status !== statusFiltro) return false
+      if (dataInicio && f.criado_em < dataInicio) return false
+      if (dataFim && f.criado_em > dataFim + ' 23:59:59') return false
       if (!busca.trim()) return true
       const q = busca.toLowerCase()
       return (
@@ -72,7 +83,7 @@ export default function FretesPage() {
         f.veiculos?.placa.toLowerCase().includes(q)
       )
     })
-  }, [fretes, busca, statusFiltro])
+  }, [fretes, busca, statusFiltro, dataInicio, dataFim])
 
   return (
     <div className="flex flex-col gap-4">
@@ -114,10 +125,33 @@ export default function FretesPage() {
             ))}
           </SelectContent>
         </Select>
-        {(busca || statusFiltro !== 'TODOS') && (
-          <span className="text-sm text-muted-foreground">
-            {fretefiltrados.length} resultado{fretefiltrados.length !== 1 ? 's' : ''}
-          </span>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground whitespace-nowrap">De:</label>
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="border border-slate-200 rounded-md px-2 py-1 text-sm"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-muted-foreground whitespace-nowrap">Até:</label>
+          <input
+            type="date"
+            value={dataFim}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="border border-slate-200 rounded-md px-2 py-1 text-sm"
+          />
+        </div>
+        {(busca || statusFiltro !== 'TODOS' || dataInicio || dataFim) && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {fretefiltrados.length} resultado{fretefiltrados.length !== 1 ? 's' : ''}
+            </span>
+            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-7 px-2 text-xs">
+              Limpar filtros
+            </Button>
+          </div>
         )}
       </div>
 

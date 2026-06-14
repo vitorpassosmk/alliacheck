@@ -202,6 +202,10 @@ export type Database = {
           criado_por: string | null
           criado_em: string
           atualizado_em: string
+          pago_em: string | null
+          pago_por: string | null
+          excluido_em: string | null
+          excluido_por: string | null
         }
         Insert: {
           id?: string
@@ -230,6 +234,10 @@ export type Database = {
           criado_por?: string | null
           criado_em?: string
           atualizado_em?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
         }
         Update: {
           id?: string
@@ -258,6 +266,10 @@ export type Database = {
           criado_por?: string | null
           criado_em?: string
           atualizado_em?: string
+          pago_em?: string | null
+          pago_por?: string | null
+          excluido_em?: string | null
+          excluido_por?: string | null
         }
         Relationships: [
           {

@@ -39,6 +39,12 @@ const navItems: NavItem[] = [
   { href: '/usuarios', label: 'Usuários', icon: UserCog, somente: ['ADMIN'] },
 ]
 
+const labelPapel: Record<Papel, string> = {
+  ADMIN: 'Administrador',
+  SUPERVISOR: 'Supervisor',
+  CONFERENTE: 'Conferente',
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -65,20 +71,20 @@ export function Sidebar() {
   )
 
   return (
-    <aside className="flex flex-col w-64 h-screen border-r bg-background shrink-0">
+    <aside className="flex flex-col w-64 h-screen bg-[#0F172A] border-r border-white/10 shrink-0">
       {/* Logo */}
-      <div className="p-4 border-b">
-        <div
-          className="text-lg font-bold text-white px-3 py-1.5 rounded-lg inline-block"
-          style={{ backgroundColor: 'var(--brand-primary)' }}
-        >
-          ALLiA Check
+      <div className="p-4 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-bold text-white tracking-tight">
+            ALLiA Check
+          </span>
+          <span className="w-2 h-2 rounded-full bg-[#E33900] shrink-0" />
         </div>
-        <p className="text-xs text-muted-foreground mt-1 pl-1">Madiã Transportes</p>
+        <p className="text-xs text-slate-500 mt-0.5 pl-0.5">Madiã Transportes</p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {itemsVisiveis.map(({ href, label, icon: Icon }) => {
           const ativo = pathname === href || pathname.startsWith(href + '/')
           return (
@@ -87,8 +93,8 @@ export function Sidebar() {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                   ativo
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'bg-[#E33900]/15 text-[#E33900] border-l-2 border-[#E33900] pl-[10px]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent pl-[10px]'
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -99,11 +105,20 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Role badge */}
+      {papel && (
+        <div className="px-4 pb-2">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/10 text-slate-300">
+            {labelPapel[papel]}
+          </span>
+        </div>
+      )}
+
       {/* Logout */}
-      <div className="p-3 border-t">
+      <div className="p-3 border-t border-white/10">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground"
+          className="w-full justify-start gap-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4" />
@@ -112,11 +127,9 @@ export function Sidebar() {
       </div>
 
       {/* ALLiA footer */}
-      <div className="p-3 border-t text-xs text-muted-foreground text-center">
+      <div className="p-3 border-t border-white/10 text-xs text-slate-600 text-center">
         powered by{' '}
-        <span className="font-medium" style={{ color: 'var(--allia-teal)' }}>
-          ALLiA Lab
-        </span>
+        <span className="font-medium text-slate-500">ALLiA Lab</span>
       </div>
     </aside>
   )

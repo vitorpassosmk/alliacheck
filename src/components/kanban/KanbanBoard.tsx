@@ -13,9 +13,6 @@ interface KanbanBoardProps {
 }
 
 async function fetchFretes(supabase: ReturnType<typeof createClient>) {
-  const agora = new Date()
-  const limite24h = new Date(agora.getTime() - 24 * 60 * 60 * 1000).toISOString()
-
   const { data, error } = await supabase
     .from('fretes')
     .select(`
@@ -25,7 +22,7 @@ async function fetchFretes(supabase: ReturnType<typeof createClient>) {
       veiculos(placa, tipo, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .neq('status', 'CANCELADO')
-    .or(`status.neq.CONCLUIDA,atualizado_em.gte.${limite24h}`)
+    .or('status.neq.CONCLUIDA,pago_em.is.null')
     .order('criado_em', { ascending: false })
 
   if (error) throw error

@@ -2,6 +2,54 @@ import { createClient } from '@/lib/supabase/server'
 import { invalidUUID } from '@/lib/api-helpers'
 import { z } from 'zod'
 
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const uuidErr = invalidUUID(id)
+  if (uuidErr) return uuidErr
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (perfil?.papel !== 'ADMIN') {
+    return Response.json({ error: 'Apenas ADMINs podem excluir fretes' }, { status: 403 })
+  }
+
+  const { data: frete } = await supabase
+    .from('fretes')
+    .select('status, numero_frete, excluido_em')
+    .eq('id', id)
+    .single()
+
+  if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
+  if (frete.excluido_em) return Response.json({ error: 'Frete já excluído' }, { status: 409 })
+  if (['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)) {
+    return Response.json({ error: 'Fretes EM VIAGEM ou CONCLUÍDA não podem ser excluídos' }, { status: 422 })
+  }
+
+  const { error: updateError } = await supabase
+    .from('fretes')
+    .update({ excluido_em: new Date().toISOString(), excluido_por: user.id })
+    .eq('id', id)
+
+  if (updateError) return Response.json({ error: 'Erro interno' }, { status: 500 })
+
+  await supabase.from('eventos').insert({
+    frete_id: id,
+    tipo: 'FRETE_EXCLUIDO',
+    descricao: `Frete ${frete.numero_frete} excluído por ADMIN`,
+    usuario_id: user.id,
+    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    user_agent: request.headers.get('user-agent'),
+  })
+
+  return Response.json({ ok: true })
+}
+
 const FreteUpdateSchema = z.object({
   cliente_id: z.string().uuid().nullable().optional(),
   motorista_id: z.string().uuid().nullable().optional(),

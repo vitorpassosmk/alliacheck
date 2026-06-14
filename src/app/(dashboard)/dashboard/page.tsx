@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
 import { FreteDetailModal } from '@/components/fretes/FreteDetailModal'
@@ -23,16 +23,46 @@ function calcularKpis(fretes: FreteComRelacoes[]): KpiBarData {
   }
 }
 
+function filtrarPorPeriodo(
+  fretes: FreteComRelacoes[],
+  inicio: string,
+  fim: string,
+): FreteComRelacoes[] {
+  if (!inicio && !fim) return fretes
+
+  return fretes.filter((f) => {
+    // Usa criado_em como referência de data do frete
+    const dataCriacao = f.criado_em ? f.criado_em.slice(0, 10) : null
+    if (!dataCriacao) return true
+
+    if (inicio && dataCriacao < inicio) return false
+    if (fim && dataCriacao > fim) return false
+    return true
+  })
+}
+
 export default function DashboardPage() {
   const [freteDetalhe, setFreteDetalhe] = useState<FreteComRelacoes | null>(null)
   const [novoFreteOpen, setNovoFreteOpen] = useState(false)
+  const [periodoInicio, setPeriodoInicio] = useState('')
+  const [periodoFim, setPeriodoFim] = useState('')
 
   const { data: fretes, isLoading } = useQuery<FreteComRelacoes[]>({
     queryKey: ['fretes'],
     queryFn: () => fetch('/api/fretes').then((r) => r.json()),
   })
 
-  const kpis = fretes ? calcularKpis(fretes) : null
+  const fretesFiltrados = useMemo(() => {
+    if (!fretes) return null
+    return filtrarPorPeriodo(fretes, periodoInicio, periodoFim)
+  }, [fretes, periodoInicio, periodoFim])
+
+  const kpis = fretesFiltrados ? calcularKpis(fretesFiltrados) : null
+
+  function handlePeriodoChange(inicio: string, fim: string) {
+    setPeriodoInicio(inicio)
+    setPeriodoFim(fim)
+  }
 
   return (
     <div className="flex flex-col h-full gap-3 min-h-0">
@@ -50,7 +80,12 @@ export default function DashboardPage() {
       {isLoading ? (
         <Skeleton className="h-[88px] w-full rounded-lg shrink-0" />
       ) : kpis ? (
-        <KpiBar data={kpis} />
+        <KpiBar
+          data={kpis}
+          periodoInicio={periodoInicio}
+          periodoFim={periodoFim}
+          onPeriodoChange={handlePeriodoChange}
+        />
       ) : null}
 
       <div className="flex-1 min-h-0">
