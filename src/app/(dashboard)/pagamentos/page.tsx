@@ -384,7 +384,7 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
+  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
 
   return (
     <>
@@ -434,16 +434,16 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
 
           {/* Dados bancários */}
           {motoristaPropriétario ? (
-            m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) && (
+            m && (m.banco || m.chave_pix) && (
               <div className="border-t pt-2 space-y-1">
                 <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                   <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
                 </p>
-                {(m as { banco?: string }).banco && (
-                  <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
+                {m.banco && (
+                  <p className="text-xs">{m.banco} · {m.agencia_conta}</p>
                 )}
-                {(m as { chave_pix?: string }).chave_pix && (
-                  <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
+                {m.chave_pix && (
+                  <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>
                 )}
               </div>
             )
@@ -544,7 +544,7 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
+  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
 
   return (
     <>
@@ -611,16 +611,16 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
 
           {/* Dados bancários — lógica exclusiva: motorista/proprietário OU proprietário */}
           {motoristaPropriétario ? (
-            m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) ? (
+            m && (m.banco || m.chave_pix) ? (
               <div className="border-t pt-2 space-y-1">
                 <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                   <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
                 </p>
-                {(m as { banco?: string }).banco && (
-                  <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
+                {m.banco && (
+                  <p className="text-xs">{m.banco} · {m.agencia_conta}</p>
                 )}
-                {(m as { chave_pix?: string }).chave_pix && (
-                  <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
+                {m.chave_pix && (
+                  <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>
                 )}
               </div>
             ) : null
