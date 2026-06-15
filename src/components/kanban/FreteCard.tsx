@@ -120,6 +120,9 @@ function FreteCardLiberacao({ frete, onClick }: FreteCardProps) {
             <span className="truncate">{frete.motoristas.nome}</span>
           </div>
         )}
+        {frete.motoristas?.cpf && (
+          <p className="text-xs text-muted-foreground pl-4 truncate">CPF: {frete.motoristas.cpf}</p>
+        )}
         <DataLabel frete={frete} />
         {frete.valor_mercadoria && (
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-700">
@@ -168,6 +171,9 @@ function FreteCardCompacto({ frete, onClick }: FreteCardProps) {
             <User className="h-3 w-3 shrink-0" />
             <span className="truncate">{frete.motoristas.nome}</span>
           </div>
+        )}
+        {frete.motoristas?.cpf && (
+          <p className="text-xs text-muted-foreground pl-4 truncate">CPF: {frete.motoristas.cpf}</p>
         )}
 
         <DataLabel frete={frete} />
