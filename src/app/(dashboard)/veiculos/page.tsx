@@ -132,7 +132,7 @@ export default function VeiculosPage() {
       agencia_conta_proprietario: v.agencia_conta_proprietario ?? '',
       chave_pix_proprietario: v.chave_pix_proprietario ?? '',
       rntrc: v.rntrc ?? '',
-      tag: (v as typeof v & { tag?: string | null }).tag ?? '',
+      tag: v.tag ?? '',
     })
     setModalOpen(true)
   }
@@ -172,8 +172,8 @@ export default function VeiculosPage() {
                   {v.ano && <><span>·</span><span>{v.ano}</span></>}
                   {v.proprietario && <><span>·</span><span>{v.proprietario}</span></>}
                   {v.rntrc && <><span>·</span><span>RNTRC: {v.rntrc}</span></>}
-                  {(v as typeof v & { tag?: string | null }).tag && (
-                    <><span>·</span><span>TAG: {(v as typeof v & { tag?: string | null }).tag}</span></>
+                  {v.tag && (
+                    <><span>·</span><span>TAG: {v.tag}</span></>
                   )}
                 </div>
               </div>
