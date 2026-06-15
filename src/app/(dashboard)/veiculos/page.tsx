@@ -330,7 +330,7 @@ export default function VeiculosPage() {
                       </FormItem>
                     )}
                   />
-                )
+                )}
               </div>
 
               {/* Dados Bancários do Proprietário */}
