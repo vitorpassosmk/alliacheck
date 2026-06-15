@@ -15,8 +15,8 @@ export async function DELETE(
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
-  if (perfil?.papel !== 'ADMIN') {
-    return Response.json({ error: 'Apenas ADMINs podem excluir fretes' }, { status: 403 })
+  if (!['ADMIN', 'SUPERVISOR'].includes(perfil?.papel ?? '')) {
+    return Response.json({ error: 'Apenas ADMIN e SUPERVISOR podem excluir fretes' }, { status: 403 })
   }
 
   const { data: frete } = await supabase
@@ -41,7 +41,7 @@ export async function DELETE(
   await supabase.from('eventos').insert({
     frete_id: id,
     tipo: 'FRETE_EXCLUIDO',
-    descricao: `Frete ${frete.numero_frete} excluído por ADMIN`,
+    descricao: `Frete ${frete.numero_frete} excluído por ${perfil?.papel ?? 'DESCONHECIDO'}`,
     usuario_id: user.id,
     ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
     user_agent: request.headers.get('user-agent'),
@@ -88,6 +88,7 @@ export async function GET(
       eventos(*)
     `)
     .eq('id', id)
+    .is('excluido_em', null)
     .order('criado_em', { referencedTable: 'eventos', ascending: true })
     .single()
 
@@ -124,6 +125,7 @@ export async function PATCH(
     .from('fretes')
     .update(parsed.data)
     .eq('id', id)
+    .is('excluido_em', null)
     .select()
     .single()
 

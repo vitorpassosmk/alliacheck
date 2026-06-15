@@ -28,7 +28,7 @@ export function KanbanColumn({ status, fretes, loading, onCardClick }: KanbanCol
         <span className="text-xs text-muted-foreground font-medium">{fretes.length}</span>
       </div>
 
-      <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-hidden pt-1">
+      <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto pt-1">
         {loading ? (
           <>
             <Skeleton className="h-16 rounded-lg shrink-0" />

@@ -34,6 +34,7 @@ export async function PATCH(
     .from('fretes')
     .select('status, numero_frete')
     .eq('id', id)
+    .is('excluido_em', null)
     .single()
 
   if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
@@ -53,6 +54,10 @@ export async function PATCH(
     const veiculo_id = body.veiculo_id as string | undefined
     if (!motorista_id || !veiculo_id) {
       return Response.json({ error: 'Selecione motorista e veículo para programar o frete' }, { status: 422 })
+    }
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRe.test(motorista_id) || !uuidRe.test(veiculo_id)) {
+      return Response.json({ error: 'IDs de motorista e veículo inválidos' }, { status: 422 })
     }
     camposAdicionais.motorista_id = motorista_id
     camposAdicionais.veiculo_id = veiculo_id

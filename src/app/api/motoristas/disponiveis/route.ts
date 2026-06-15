@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 
-const STATUS_ATIVOS = ['PROGRAMADO', 'CARREGANDO', 'CTE_EMITIDO', 'AGUARDANDO_LIBERACAO', 'EM_VIAGEM']
+const STATUS_ATIVOS = ['PROGRAMADO', 'CARREGANDO', 'CTE_EMITIDO', 'AGUARDANDO_LIBERACAO', 'EM_VIAGEM'] as const
 
 export async function GET() {
   const supabase = await createClient()

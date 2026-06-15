@@ -31,6 +31,7 @@ export async function GET() {
       motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
       veiculos(placa, tipo, placa_carreta, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
+    .is('excluido_em', null)
     .order('criado_em', { ascending: false })
 
   if (error) return Response.json({ error: error.message }, { status: 500 })

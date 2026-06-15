@@ -13,11 +13,17 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Apenas ADMINs e SUPERVISORs podem confirmar pagamentos' }, { status: 403 })
+  }
+
   // Verifica se o frete existe, está CONCLUIDA e ainda não foi pago
   const { data: frete } = await supabase
     .from('fretes')
     .select('status, pago_em, numero_frete')
     .eq('id', id)
+    .is('excluido_em', null)
     .single()
 
   if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })

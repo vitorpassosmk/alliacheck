@@ -8,6 +8,7 @@ export async function GET() {
   const { count, error } = await supabase
     .from('fretes')
     .select('id', { count: 'exact', head: true })
+    .is('excluido_em', null)
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
 

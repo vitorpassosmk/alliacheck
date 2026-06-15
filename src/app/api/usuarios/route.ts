@@ -17,8 +17,8 @@ export async function GET() {
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
-  if (perfil?.papel !== 'ADMIN') {
-    return Response.json({ error: 'Apenas ADMINs podem listar usuários' }, { status: 403 })
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Apenas ADMINs e SUPERVISORs podem listar usuários' }, { status: 403 })
   }
 
   const { data, error } = await supabase

@@ -13,7 +13,8 @@ import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2 } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, CheckCircle2, XCircle } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { Tables } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
 
@@ -96,6 +97,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   // Diálogo de senha — exclusão
   const [senhaExclusaoAberta, setSenhaExclusaoAberta] = useState(false)
   const [loadingExclusao, setLoadingExclusao] = useState(false)
+
+  // Checklist de conferência — AGUARDANDO_LIBERACAO
+  const [dadosBancariosConferidos, setDadosBancariosConferidos] = useState(false)
 
   const { data: frete, isLoading } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -238,9 +242,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
   const proximos = frete ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO') : []
   const nextStatus = proximos[0] as StatusViagem | undefined
-  const podeCancelar = frete && !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
+  const podeCancelar = papel === 'ADMIN' && frete && !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
   const podeExcluir =
-    papel === 'ADMIN' &&
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
     frete !== undefined &&
     !['EM_VIAGEM', 'CONCLUIDA'].includes(frete?.status ?? '')
 
@@ -307,6 +311,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setNumeroCiot={setNumeroCiot}
                     valorAdiantamento={valorAdiantamento}
                     setValorAdiantamento={setValorAdiantamento}
+                    dadosBancariosConferidos={dadosBancariosConferidos}
                   />
                   {podeCancelar && !cancelando && (
                     <Button
@@ -332,7 +337,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
               {/* Painel expandido para AGUARDANDO_LIBERACAO */}
               {frete.status === 'AGUARDANDO_LIBERACAO' && (
-                <LiberacaoPanel frete={frete} />
+                <LiberacaoPanel frete={frete} onConferido={setDadosBancariosConferidos} />
               )}
 
               {/* Informações do frete */}
@@ -483,6 +488,7 @@ interface TransitionFormProps {
   setNumeroCiot: (v: string) => void
   valorAdiantamento: string
   setValorAdiantamento: (v: string) => void
+  dadosBancariosConferidos: boolean
 }
 
 function TransitionForm({
@@ -492,6 +498,7 @@ function TransitionForm({
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
+  dadosBancariosConferidos,
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
@@ -630,9 +637,11 @@ function TransitionForm({
         size="sm"
         className="bg-green-600 hover:bg-green-700 text-white"
         onClick={() => onAvancar('EM_VIAGEM')}
-        disabled={isPending}
+        disabled={isPending || !dadosBancariosConferidos}
       >
-        Pagamento Realizado — Liberar para Viagem
+        {dadosBancariosConferidos
+          ? 'Pagamento Realizado — Liberar para Viagem'
+          : 'Confirme os dados bancários abaixo para liberar'}
       </Button>
     )
   }
@@ -654,18 +663,73 @@ function TransitionForm({
 
 // ─── Painel de Liberação ─────────────────────────────────────────────────────
 
-function LiberacaoPanel({ frete }: { frete: FreteCompleto }) {
+function LiberacaoPanel({
+  frete,
+  onConferido,
+}: {
+  frete: FreteCompleto
+  onConferido: (v: boolean) => void
+}) {
+  const [bancarioConferido, setBancarioConferido] = useState(false)
   const m = frete.motoristas
   const v = frete.veiculos
+
+  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+
+  function handleBancarioChange(checked: boolean) {
+    setBancarioConferido(checked)
+    onConferido(checked)
+  }
+
+  const checklistItems = [
+    { label: 'N° GR (seguro)', value: frete.numero_gr, key: 'gr' },
+    { label: 'Chave CT-e', value: frete.chave_cte, key: 'cte' },
+    { label: 'N° Contrato', value: frete.numero_contrato, key: 'contrato' },
+    { label: 'CIOT', value: frete.numero_ciot, key: 'ciot' },
+  ]
 
   return (
     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4">
       <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-800">
         <FileText className="h-4 w-4" />
-        Dados para Liberação de Pagamento
+        Conferência de Liberação
       </h3>
 
-      <div className="grid grid-cols-2 gap-4 text-sm">
+      {/* Checklist de documentos */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documentos</p>
+        {checklistItems.map((item) => (
+          <div key={item.key} className="flex items-start gap-2 text-sm">
+            {item.value ? (
+              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            )}
+            <span className="font-medium min-w-[110px]">{item.label}:</span>
+            <span className="font-mono text-xs text-muted-foreground break-all">
+              {item.value ?? <span className="text-red-500 italic">não registrado</span>}
+            </span>
+          </div>
+        ))}
+
+        {/* Checkbox manual — dados bancários */}
+        <div className="flex items-start gap-2 pt-1">
+          <Checkbox
+            id="bancario-conferido"
+            checked={bancarioConferido}
+            onCheckedChange={(checked) => handleBancarioChange(checked === true)}
+            className="mt-0.5"
+          />
+          <label
+            htmlFor="bancario-conferido"
+            className="text-sm font-medium cursor-pointer select-none"
+          >
+            Dados bancários do proprietário conferidos
+          </label>
+        </div>
+      </div>
+
+      <div className="border-t border-amber-200 pt-3 grid grid-cols-2 gap-4 text-sm">
         {/* Motorista */}
         {m && (
           <div className="space-y-1">
@@ -680,41 +744,58 @@ function LiberacaoPanel({ frete }: { frete: FreteCompleto }) {
           </div>
         )}
 
-        {/* Documentos do frete */}
+        {/* Adiantamento */}
         <div className="space-y-1">
-          <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Documentos</p>
-          {frete.numero_gr && <p>GR (seguro): <span className="font-mono">{frete.numero_gr}</span></p>}
-          {frete.numero_contrato && <p>Contrato: <span className="font-mono">{frete.numero_contrato}</span></p>}
-          {frete.numero_ciot && <p>CIOT: <span className="font-mono">{frete.numero_ciot}</span></p>}
-          {frete.valor_adiantamento && (
-            <p>Adiantamento: <span className="font-semibold">
+          <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Adiantamento</p>
+          {frete.valor_adiantamento ? (
+            <p className="text-lg font-semibold text-amber-900">
               R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span></p>
+            </p>
+          ) : (
+            <p className="text-muted-foreground italic">Não informado</p>
           )}
         </div>
 
-        {/* Dados bancários do motorista */}
-        {m && (m.banco || m.agencia_conta || m.chave_pix) && (
-          <div className="space-y-1">
-            <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-              <CreditCard className="h-3 w-3" /> Dados Bancários — Motorista
-            </p>
-            {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
-            {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
-            {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
-          </div>
-        )}
+        {/* Dados bancários para pagamento — lógica de proprietário */}
+        {motoristaPropriétario ? (
+          (m && (m.banco || m.agencia_conta || m.chave_pix)) ? (
+            <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
+              <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
+                <CreditCard className="h-3 w-3" /> Dados para Pagamento — Motorista / Proprietário
+              </p>
+              {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
+              {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
+              {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
+            </div>
+          ) : null
+        ) : (
+          <>
+            {/* Proprietário do veículo — destinatário do pagamento */}
+            {v && (v.banco_proprietario || v.agencia_conta_proprietario || v.chave_pix_proprietario) && (
+              <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
+                <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
+                  <CreditCard className="h-3 w-3" /> Dados para Pagamento — Proprietário do Veículo
+                  {v.proprietario && <span className="ml-1 normal-case font-normal">({v.proprietario})</span>}
+                </p>
+                {v.banco_proprietario && <p className="text-muted-foreground">Banco: {v.banco_proprietario}</p>}
+                {v.agencia_conta_proprietario && <p className="text-muted-foreground">Ag/Conta: {v.agencia_conta_proprietario}</p>}
+                {v.chave_pix_proprietario && <p className="text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
+              </div>
+            )}
 
-        {/* Dados bancários do proprietário do veículo */}
-        {v && (v.banco_proprietario || v.agencia_conta_proprietario || v.chave_pix_proprietario) && (
-          <div className="space-y-1">
-            <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-              <CreditCard className="h-3 w-3" /> Dados Bancários — Proprietário do Veículo
-            </p>
-            {v.banco_proprietario && <p className="text-muted-foreground">Banco: {v.banco_proprietario}</p>}
-            {v.agencia_conta_proprietario && <p className="text-muted-foreground">Ag/Conta: {v.agencia_conta_proprietario}</p>}
-            {v.chave_pix_proprietario && <p className="text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
-          </div>
+            {/* Dados bancários do motorista — apenas informativo */}
+            {m && (m.banco || m.agencia_conta || m.chave_pix) && (
+              <div className="col-span-2 space-y-1">
+                <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <CreditCard className="h-3 w-3" /> Dados Bancários — Motorista
+                  <span className="normal-case font-normal text-amber-600">(não é o proprietário)</span>
+                </p>
+                {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
+                {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
+                {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

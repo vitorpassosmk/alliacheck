@@ -47,7 +47,7 @@ export async function PATCH(
 
   // Atualiza papel/nome/telefone/ativo na tabela users
   if (Object.keys(camposTabela).length > 0 || papel) {
-    const update: Record<string, unknown> = { ...camposTabela }
+    const update: { nome?: string; telefone?: string | null; ativo?: boolean; papel?: 'ADMIN' | 'SUPERVISOR' | 'CONFERENTE' } = { ...camposTabela }
     if (papel) update.papel = papel
 
     const { error } = await supabase.from('users').update(update).eq('id', id)

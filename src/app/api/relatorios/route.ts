@@ -10,9 +10,17 @@ export async function GET(request: Request) {
   const dataFim = url.searchParams.get('data_fim')
   const clienteId = url.searchParams.get('cliente_id')
   const statusViagem = url.searchParams.get('status')
+  const STATUS_VALIDOS = ['ABERTO', 'PROGRAMADO', 'CARREGANDO', 'CTE_EMITIDO', 'AGUARDANDO_LIBERACAO', 'EM_VIAGEM', 'CONCLUIDA', 'CANCELADO'] as const
+  type StatusValido = typeof STATUS_VALIDOS[number]
+
+  if (statusViagem && !STATUS_VALIDOS.includes(statusViagem as StatusValido)) {
+    return Response.json({ error: 'Status inválido' }, { status: 422 })
+  }
+
   let query = supabase
     .from('fretes')
     .select(`*, clientes(razao_social), motoristas(nome), veiculos(placa, tipo)`)
+    .is('excluido_em', null)
     .order('criado_em', { ascending: false })
 
   if (dataInicio) query = query.gte('criado_em', dataInicio)
@@ -22,8 +30,7 @@ export async function GET(request: Request) {
     query = query.lte('criado_em', fim.toISOString())
   }
   if (clienteId) query = query.eq('cliente_id', clienteId)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (statusViagem) query = query.eq('status', statusViagem as any)
+  if (statusViagem) query = query.eq('status', statusViagem as StatusValido)
 
   const { data: fretes, error } = await query
   if (error) return Response.json({ error: error.message }, { status: 500 })
