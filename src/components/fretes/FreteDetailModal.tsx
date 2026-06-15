@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import { FreteFormModal } from '@/components/fretes/FreteFormModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, Info } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { Tables, EventoComUsuario } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
@@ -78,6 +78,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [senhaEditAberta, setSenhaEditAberta] = useState(false)
   const [loadingEditSenha, setLoadingEditSenha] = useState(false)
   const [editAberto, setEditAberto] = useState(false)
+
+  // Checklist de conferência — AGUARDANDO_LIBERACAO
+  const [todoConferido, setTodoConferido] = useState(false)
 
   const { data: frete, isLoading } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -310,6 +313,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setNumeroCiot={setNumeroCiot}
                     valorAdiantamento={valorAdiantamento}
                     setValorAdiantamento={setValorAdiantamento}
+                    liberacaoConferida={todoConferido}
                   />
                   {/* Item 5: SUPERVISOR também pode cancelar */}
                   {podeCancelar && !cancelando && (
@@ -336,7 +340,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
               {/* Item 6: Painel de conferência — AGUARDANDO_LIBERACAO */}
               {frete.status === 'AGUARDANDO_LIBERACAO' && (
-                <LiberacaoPanel frete={frete} />
+                <LiberacaoPanel frete={frete} onConferido={setTodoConferido} />
               )}
 
               {/* Informações do frete */}
@@ -514,6 +518,7 @@ interface TransitionFormProps {
   setNumeroCiot: (v: string) => void
   valorAdiantamento: string
   setValorAdiantamento: (v: string) => void
+  liberacaoConferida?: boolean
 }
 
 function TransitionForm({
@@ -526,6 +531,7 @@ function TransitionForm({
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
+  liberacaoConferida,
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
@@ -689,17 +695,18 @@ function TransitionForm({
     )
   }
 
-  // Item 11: AGUARDANDO_LIBERACAO — transição agora vem da página de Pagamentos
   if (status === 'AGUARDANDO_LIBERACAO') {
     return (
-      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-        <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-        <p>
-          Confira os documentos abaixo e acesse{' '}
-          <span className="font-medium text-amber-700">Pagamentos</span>{' '}
-          para confirmar o adiantamento e liberar a viagem automaticamente.
-        </p>
-      </div>
+      <Button
+        size="sm"
+        className="bg-green-600 hover:bg-green-700 text-white"
+        onClick={() => onAvancar('EM_VIAGEM')}
+        disabled={isPending || !liberacaoConferida}
+      >
+        {liberacaoConferida
+          ? 'Pagamento Realizado — Liberar para Viagem'
+          : 'Confirme todos os itens abaixo para liberar'}
+      </Button>
     )
   }
 
@@ -716,8 +723,7 @@ function TransitionForm({
 
 // ─── Painel de Liberação ─────────────────────────────────────────────────────
 
-function LiberacaoPanel({ frete }: { frete: FreteCompleto }) {
-  // Item 6: checkboxes interativos para cada item do checklist
+function LiberacaoPanel({ frete, onConferido }: { frete: FreteCompleto; onConferido?: (v: boolean) => void }) {
   const [grConferido, setGrConferido] = useState(false)
   const [cteConferido, setCteConferido] = useState(false)
   const [contratoConferido, setContratoConferido] = useState(false)
@@ -736,6 +742,11 @@ function LiberacaoPanel({ frete }: { frete: FreteCompleto }) {
   ]
 
   const todosConferidos = grConferido && cteConferido && contratoConferido && ciotConferido && bancarioConferido
+
+  // Notifica o pai quando o estado de conferência muda para habilitar o botão "Liberar"
+  useEffect(() => {
+    onConferido?.(todosConferidos)
+  }, [todosConferidos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4">
