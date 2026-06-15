@@ -146,6 +146,14 @@ export async function PATCH(
     camposAdicionais.valor_adiantamento = adiantamentoFinal
   }
 
+  if (novoStatus === 'CONCLUIDA') {
+    const data_entrega_real = (body.data_entrega_real as string | undefined)?.trim()
+    if (!data_entrega_real) {
+      return Response.json({ error: 'Data de descarga é obrigatória para concluir a viagem' }, { status: 422 })
+    }
+    camposAdicionais.data_entrega_real = data_entrega_real
+  }
+
   const motivoSanitizado = novoStatus === 'CANCELADO'
     ? (body.motivo as string | undefined)?.trim().slice(0, 500)
     : undefined

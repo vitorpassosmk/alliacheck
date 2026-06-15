@@ -41,7 +41,7 @@ function formatDate(dateStr: string | null) {
 function TableRowSkeleton() {
   return (
     <TableRow>
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: 9 }).map((_, i) => (
         <TableCell key={i}>
           <Skeleton className="h-5 w-full" />
         </TableCell>
@@ -168,6 +168,7 @@ export default function FretesPage() {
               <TableHead>Status</TableHead>
               <TableHead>CT-e</TableHead>
               <TableHead>Carregamento</TableHead>
+              <TableHead>Descarga</TableHead>
               <TableHead className="text-right">Valor</TableHead>
             </TableRow>
           </TableHeader>
@@ -176,7 +177,7 @@ export default function FretesPage() {
               Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} />)
             ) : fretefiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   {busca || statusFiltro !== 'TODOS'
                     ? 'Nenhum frete encontrado com os filtros aplicados.'
                     : 'Nenhum frete cadastrado ainda.'}
@@ -210,6 +211,7 @@ export default function FretesPage() {
                     {frete.chave_cte ? frete.chave_cte.slice(-8) : '—'}
                   </TableCell>
                   <TableCell>{formatDate(frete.data_carregamento)}</TableCell>
+                  <TableCell>{formatDate(frete.data_entrega_real)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {formatCurrency(frete.valor_frete)}
                   </TableCell>

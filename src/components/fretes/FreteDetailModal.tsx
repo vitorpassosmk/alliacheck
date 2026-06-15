@@ -62,6 +62,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
   const [dataEntregaPrevistaForm, setDataEntregaPrevistaForm] = useState('')
 
+  // Formulário EM_VIAGEM → CONCLUIDA
+  const [dataDescarga, setDataDescarga] = useState('')
+
   // Formulário PROGRAMADO → CARREGANDO
   const [numeroGr, setNumeroGr] = useState('')
 
@@ -157,6 +160,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         body.numero_ciot = numeroCiot
         body.valor_adiantamento = parsePositive(valorAdiantamento)
       }
+      if (novoStatus === 'CONCLUIDA') {
+        body.data_entrega_real = dataDescarga
+      }
 
       const res = await fetch(`/api/fretes/${freteId}/status`, {
         method: 'PATCH',
@@ -174,6 +180,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setNumeroCiot(''); setValorAdiantamento('')
       setCustoAgregado(''); setDataCarregamentoForm(''); setDataEntregaPrevistaForm('')
       setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta('')
+      setDataDescarga('')
       toast.success('Status atualizado')
     },
     onError: (e: Error) => {
@@ -355,6 +362,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     valorAdiantamento={valorAdiantamento}
                     setValorAdiantamento={setValorAdiantamento}
                     liberacaoConferida={todoConferido}
+                    dataDescarga={dataDescarga}
+                    setDataDescarga={setDataDescarga}
                   />
                   {/* Item 5: SUPERVISOR também pode cancelar */}
                   {podeCancelar && !cancelando && (
@@ -582,6 +591,8 @@ interface TransitionFormProps {
   valorAdiantamento: string
   setValorAdiantamento: (v: string) => void
   liberacaoConferida?: boolean
+  dataDescarga: string
+  setDataDescarga: (v: string) => void
 }
 
 function TransitionForm({
@@ -598,6 +609,7 @@ function TransitionForm({
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
   liberacaoConferida,
+  dataDescarga, setDataDescarga,
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
@@ -854,9 +866,25 @@ function TransitionForm({
 
   if (status === 'EM_VIAGEM') {
     return (
-      <Button size="sm" onClick={() => onAvancar('CONCLUIDA')} disabled={isPending}>
-        Finalizar Viagem
-      </Button>
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Informe a data de descarga para concluir a viagem</p>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Data de Descarga *</label>
+          <Input
+            type="date"
+            value={dataDescarga}
+            onChange={e => setDataDescarga(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onAvancar('CONCLUIDA')}
+          disabled={!dataDescarga || isPending}
+        >
+          Finalizar Viagem
+        </Button>
+      </div>
     )
   }
 
