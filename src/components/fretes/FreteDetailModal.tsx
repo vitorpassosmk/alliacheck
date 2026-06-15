@@ -10,38 +10,20 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { EventTimeline } from '@/components/eventos/EventTimeline'
 import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog'
+import { FreteFormModal } from '@/components/fretes/FreteFormModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, CheckCircle2, XCircle } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, Info } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
-import type { Tables } from '@/types/database.types'
+import type { Tables, EventoComUsuario } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
 
 type FreteCompleto = Tables<'fretes'> & {
   clientes: Tables<'clientes'> | null
-  motoristas: (Tables<'motoristas'> & {
-    banco: string | null
-    agencia_conta: string | null
-    chave_pix: string | null
-  }) | null
-  veiculos: (Tables<'veiculos'> & {
-    banco_proprietario: string | null
-    agencia_conta_proprietario: string | null
-    chave_pix_proprietario: string | null
-  }) | null
-  eventos: Tables<'eventos'>[]
-}
-
-const statusLabel: Record<StatusViagem, string> = {
-  ABERTO: 'Programar Frete',
-  PROGRAMADO: 'Iniciar Carregamento',
-  CARREGANDO: 'Registrar CT-e',
-  CTE_EMITIDO: 'Aguardar Liberação',
-  AGUARDANDO_LIBERACAO: 'Pagamento Realizado',
-  EM_VIAGEM: 'Finalizar Viagem',
-  CONCLUIDA: '',
-  CANCELADO: '',
+  motoristas: Tables<'motoristas'> | null
+  veiculos: Tables<'veiculos'> | null
+  eventos: EventoComUsuario[]
 }
 
 interface FreteDetailModalProps {
@@ -49,8 +31,6 @@ interface FreteDetailModalProps {
   open: boolean
   onClose: () => void
 }
-
-// ─── Verificação de senha via Supabase ───────────────────────────────────────
 
 async function verificarSenha(senha: string): Promise<boolean> {
   const supabase = createClient()
@@ -68,8 +48,6 @@ async function buscarPapelUsuario(): Promise<string | null> {
   return data?.papel ?? null
 }
 
-// ─── Modal principal ──────────────────────────────────────────────────────────
-
 export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalProps) {
   const queryClient = useQueryClient()
   const [cancelando, setCancelando] = useState(false)
@@ -77,6 +55,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   // Formulário ABERTO → PROGRAMADO
   const [motoristaId, setMotoristaId] = useState('')
   const [veiculoId, setVeiculoId] = useState('')
+  const [custoAgregado, setCustoAgregado] = useState('')
+  const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
 
   // Formulário PROGRAMADO → CARREGANDO
   const [numeroGr, setNumeroGr] = useState('')
@@ -90,16 +70,14 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [numeroCiot, setNumeroCiot] = useState('')
   const [valorAdiantamento, setValorAdiantamento] = useState('')
 
-  // Diálogo de senha — liberação EM_VIAGEM
-  const [senhaLiberacaoAberta, setSenhaLiberacaoAberta] = useState(false)
-  const [loadingLiberacao, setLoadingLiberacao] = useState(false)
-
   // Diálogo de senha — exclusão
   const [senhaExclusaoAberta, setSenhaExclusaoAberta] = useState(false)
   const [loadingExclusao, setLoadingExclusao] = useState(false)
 
-  // Checklist de conferência — AGUARDANDO_LIBERACAO
-  const [dadosBancariosConferidos, setDadosBancariosConferidos] = useState(false)
+  // Modo de edição com senha
+  const [senhaEditAberta, setSenhaEditAberta] = useState(false)
+  const [loadingEditSenha, setLoadingEditSenha] = useState(false)
+  const [editAberto, setEditAberto] = useState(false)
 
   const { data: frete, isLoading } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -134,20 +112,25 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     mutationFn: async (novoStatus: StatusViagem) => {
       const body: Record<string, unknown> = { status: novoStatus }
 
+      const parsePositive = (v: string): number | undefined => {
+        const n = parseFloat(v)
+        return !isNaN(n) && n > 0 ? n : undefined
+      }
+
       if (novoStatus === 'PROGRAMADO') {
         body.motorista_id = motoristaId
         body.veiculo_id = veiculoId
+        if (custoAgregado) body.custo_agregado = parsePositive(custoAgregado)
+        if (!frete?.data_carregamento && dataCarregamentoForm) {
+          body.data_carregamento = dataCarregamentoForm
+        }
       }
-      if (novoStatus === 'CARREGANDO') {
-        body.numero_gr = numeroGr
-      }
-      if (novoStatus === 'CTE_EMITIDO') {
-        body.chave_cte = chaveCte
-      }
+      if (novoStatus === 'CARREGANDO') body.numero_gr = numeroGr
+      if (novoStatus === 'CTE_EMITIDO') body.chave_cte = chaveCte
       if (novoStatus === 'AGUARDANDO_LIBERACAO') {
         body.numero_contrato = numeroContrato
         body.numero_ciot = numeroCiot
-        body.valor_adiantamento = valorAdiantamento ? parseFloat(valorAdiantamento) : undefined
+        body.valor_adiantamento = parsePositive(valorAdiantamento)
       }
 
       const res = await fetch(`/api/fretes/${freteId}/status`, {
@@ -161,14 +144,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
       queryClient.invalidateQueries({ queryKey: ['fretes'] })
-      setChaveCte('')
-      setChaveCteError('')
-      setNumeroGr('')
-      setMotoristaId('')
-      setVeiculoId('')
-      setNumeroContrato('')
-      setNumeroCiot('')
-      setValorAdiantamento('')
+      setChaveCte(''); setChaveCteError(''); setNumeroGr('')
+      setMotoristaId(''); setVeiculoId(''); setNumeroContrato('')
+      setNumeroCiot(''); setValorAdiantamento('')
+      setCustoAgregado(''); setDataCarregamentoForm('')
       toast.success('Status atualizado')
     },
     onError: (e: Error) => {
@@ -196,33 +175,11 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     onError: (e: Error) => toast.error(e.message),
   })
 
-  // ─── Handlers de senha ──────────────────────────────────────────────────────
-
-  async function handleConfirmarLiberacao(senha: string) {
-    setLoadingLiberacao(true)
-    try {
-      const ok = await verificarSenha(senha)
-      if (!ok) {
-        toast.error('Senha incorreta. Liberação cancelada.')
-        return
-      }
-      setSenhaLiberacaoAberta(false)
-      avancarStatus.mutate('EM_VIAGEM')
-    } catch {
-      toast.error('Erro ao verificar senha.')
-    } finally {
-      setLoadingLiberacao(false)
-    }
-  }
-
   async function handleConfirmarExclusao(senha: string) {
     setLoadingExclusao(true)
     try {
       const ok = await verificarSenha(senha)
-      if (!ok) {
-        toast.error('Senha incorreta. Exclusão cancelada.')
-        return
-      }
+      if (!ok) { toast.error('Senha incorreta. Exclusão cancelada.'); return }
       const res = await fetch(`/api/fretes/${freteId}`, { method: 'DELETE' })
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
@@ -233,20 +190,55 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setSenhaExclusaoAberta(false)
       queryClient.invalidateQueries({ queryKey: ['fretes'] })
       onClose()
-    } catch {
-      toast.error('Erro ao excluir frete.')
-    } finally {
-      setLoadingExclusao(false)
-    }
+    } catch { toast.error('Erro ao excluir frete.') }
+    finally { setLoadingExclusao(false) }
   }
 
-  const proximos = frete ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO') : []
+  async function handleConfirmarEdit(senha: string) {
+    setLoadingEditSenha(true)
+    try {
+      const ok = await verificarSenha(senha)
+      if (!ok) { toast.error('Senha incorreta.'); return }
+      setSenhaEditAberta(false)
+      setEditAberto(true)
+    } catch { toast.error('Erro ao verificar senha.') }
+    finally { setLoadingEditSenha(false) }
+  }
+
+  const proximos = frete
+    ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO')
+    : []
   const nextStatus = proximos[0] as StatusViagem | undefined
-  const podeCancelar = papel === 'ADMIN' && frete && !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
+
+  // Item 5: SUPERVISOR também pode cancelar
+  const podeCancelar =
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
+    frete !== undefined &&
+    !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
+
   const podeExcluir =
     ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
     frete !== undefined &&
-    !['EM_VIAGEM', 'CONCLUIDA'].includes(frete?.status ?? '')
+    !['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)
+
+  const podeEditar = ['ADMIN', 'SUPERVISOR'].includes(papel ?? '')
+
+  const editDefaultValues = frete ? {
+    numero_frete: frete.numero_frete,
+    origem_cidade: frete.origem_cidade,
+    origem_uf: frete.origem_uf,
+    destino_cidade: frete.destino_cidade,
+    destino_uf: frete.destino_uf,
+    cliente_id: frete.cliente_id ?? undefined,
+    tipo_veiculo: frete.tipo_veiculo ?? undefined,
+    tipo_produto: frete.tipo_produto ?? undefined,
+    valor_mercadoria: frete.valor_mercadoria?.toString() ?? '',
+    valor_frete: frete.valor_frete?.toString() ?? '',
+    custo_agregado: frete.custo_agregado?.toString() ?? '',
+    data_carregamento: frete.data_carregamento ?? '',
+    data_entrega_prevista: frete.data_entrega_prevista ?? undefined,
+    observacoes: frete.observacoes ?? undefined,
+  } : undefined
 
   return (
     <>
@@ -272,6 +264,18 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                       <span className="text-sm text-muted-foreground">{frete.clientes.razao_social}</span>
                     )}
                   </div>
+                  {/* Item 14: Botão de edição com senha */}
+                  {podeEditar && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setSenhaEditAberta(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                      Editar
+                    </Button>
+                  )}
                 </div>
               </DialogHeader>
 
@@ -282,14 +286,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     status={frete.status as StatusViagem}
                     nextStatus={nextStatus}
                     isPending={avancarStatus.isPending}
-                    onAvancar={(status) => {
-                      if (status === 'EM_VIAGEM') {
-                        setSenhaLiberacaoAberta(true)
-                        return
-                      }
-                      avancarStatus.mutate(status)
-                    }}
-                    // PROGRAMADO
+                    onAvancar={(status) => avancarStatus.mutate(status)}
                     motoristas={motoristas}
                     veiculos={veiculos}
                     usarDisponiveis={usarDisponiveis}
@@ -297,22 +294,24 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setMotoristaId={setMotoristaId}
                     veiculoId={veiculoId}
                     setVeiculoId={setVeiculoId}
-                    // CARREGANDO
+                    custoAgregado={custoAgregado}
+                    setCustoAgregado={setCustoAgregado}
+                    dataCarregamentoExistente={frete.data_carregamento}
+                    dataCarregamentoForm={dataCarregamentoForm}
+                    setDataCarregamentoForm={setDataCarregamentoForm}
                     numeroGr={numeroGr}
                     setNumeroGr={setNumeroGr}
-                    // CTE_EMITIDO
                     chaveCte={chaveCte}
                     setChaveCte={(v) => { setChaveCte(v); setChaveCteError('') }}
                     chaveCteError={chaveCteError}
-                    // AGUARDANDO_LIBERACAO
                     numeroContrato={numeroContrato}
                     setNumeroContrato={setNumeroContrato}
                     numeroCiot={numeroCiot}
                     setNumeroCiot={setNumeroCiot}
                     valorAdiantamento={valorAdiantamento}
                     setValorAdiantamento={setValorAdiantamento}
-                    dadosBancariosConferidos={dadosBancariosConferidos}
                   />
+                  {/* Item 5: SUPERVISOR também pode cancelar */}
                   {podeCancelar && !cancelando && (
                     <Button
                       size="sm"
@@ -335,9 +334,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 />
               )}
 
-              {/* Painel expandido para AGUARDANDO_LIBERACAO */}
+              {/* Item 6: Painel de conferência — AGUARDANDO_LIBERACAO */}
               {frete.status === 'AGUARDANDO_LIBERACAO' && (
-                <LiberacaoPanel frete={frete} onConferido={setDadosBancariosConferidos} />
+                <LiberacaoPanel frete={frete} />
               )}
 
               {/* Informações do frete */}
@@ -348,6 +347,11 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     <MapPin className="h-4 w-4 shrink-0" />
                     <span>{frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}</span>
                   </div>
+                  {frete.tipo_veiculo && (
+                    <div className="text-muted-foreground">
+                      <span className="font-medium">Veículo: </span>{frete.tipo_veiculo}
+                    </div>
+                  )}
                   <div className="text-muted-foreground col-span-2">
                     <span className="font-medium">Produto: </span>
                     {frete.tipo_produto ?? <span className="italic text-muted-foreground/60">—</span>}
@@ -379,6 +383,12 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                   {frete.valor_frete && (
                     <div className="text-muted-foreground">
                       Frete: R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  )}
+                  {frete.custo_agregado && (
+                    <div className="text-muted-foreground">
+                      <span className="font-medium">Custo Agregado: </span>
+                      R$ {frete.custo_agregado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </div>
                   )}
                   {frete.numero_gr && (
@@ -421,7 +431,6 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 <EventTimeline eventos={frete.eventos ?? []} />
               </div>
 
-              {/* Rodapé — botão Excluir (ADMIN only) */}
               {podeExcluir && (
                 <div className="pt-2 border-t flex justify-start">
                   <Button
@@ -440,17 +449,6 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de senha — liberação EM_VIAGEM */}
-      <PasswordConfirmDialog
-        open={senhaLiberacaoAberta}
-        onOpenChange={setSenhaLiberacaoAberta}
-        onConfirm={handleConfirmarLiberacao}
-        loading={loadingLiberacao}
-        title="Confirmar Liberação"
-        description="Digite sua senha para liberar o frete para EM VIAGEM"
-      />
-
-      {/* Diálogo de senha — exclusão */}
       <PasswordConfirmDialog
         open={senhaExclusaoAberta}
         onOpenChange={setSenhaExclusaoAberta}
@@ -459,6 +457,29 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         title="Excluir Frete"
         description="Esta ação é irreversível. Digite sua senha para confirmar."
       />
+
+      {/* Item 14: Senha para edição */}
+      <PasswordConfirmDialog
+        open={senhaEditAberta}
+        onOpenChange={setSenhaEditAberta}
+        onConfirm={handleConfirmarEdit}
+        loading={loadingEditSenha}
+        title="Editar Frete"
+        description="Digite sua senha para liberar a edição dos dados do frete."
+      />
+
+      {/* Item 14: Modal de edição pré-preenchido */}
+      {editAberto && (
+        <FreteFormModal
+          open={editAberto}
+          onClose={() => {
+            setEditAberto(false)
+            queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
+          }}
+          freteId={freteId}
+          defaultValues={editDefaultValues}
+        />
+      )}
     </>
   )
 }
@@ -477,6 +498,11 @@ interface TransitionFormProps {
   setMotoristaId: (v: string) => void
   veiculoId: string
   setVeiculoId: (v: string) => void
+  custoAgregado: string
+  setCustoAgregado: (v: string) => void
+  dataCarregamentoExistente: string | null
+  dataCarregamentoForm: string
+  setDataCarregamentoForm: (v: string) => void
   numeroGr: string
   setNumeroGr: (v: string) => void
   chaveCte: string
@@ -488,21 +514,24 @@ interface TransitionFormProps {
   setNumeroCiot: (v: string) => void
   valorAdiantamento: string
   setValorAdiantamento: (v: string) => void
-  dadosBancariosConferidos: boolean
 }
 
 function TransitionForm({
   status, nextStatus, isPending, onAvancar,
-  motoristas, veiculos, usarDisponiveis, motoristaId, setMotoristaId, veiculoId, setVeiculoId,
+  motoristas, veiculos, usarDisponiveis,
+  motoristaId, setMotoristaId, veiculoId, setVeiculoId,
+  custoAgregado, setCustoAgregado,
+  dataCarregamentoExistente, dataCarregamentoForm, setDataCarregamentoForm,
   numeroGr, setNumeroGr,
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
-  dadosBancariosConferidos,
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
+  // Item 1+13: ABERTO → PROGRAMADO — custo_agregado + data_carregamento condicional
   if (status === 'ABERTO') {
+    const podeProgramar = !!motoristaId && !!veiculoId && (!!dataCarregamentoExistente || !!dataCarregamentoForm)
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium">Selecione motorista e veículo para programar o frete</p>
@@ -533,11 +562,40 @@ function TransitionForm({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Item 2: Data de carregamento — somente se não definida na criação */}
+          {!dataCarregamentoExistente && (
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs text-muted-foreground">Data de Carregamento *</label>
+              <Input
+                type="date"
+                value={dataCarregamentoForm}
+                onChange={e => setDataCarregamentoForm(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
+          )}
+
+          {/* Item 1+13: Custo do Agregado */}
+          <div className="space-y-1 col-span-2">
+            <label className="text-xs text-muted-foreground">
+              Custo do Agregado (R$) — valor total a pagar ao proprietário
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={custoAgregado}
+              onChange={e => setCustoAgregado(e.target.value)}
+              placeholder="0,00"
+              className="max-w-xs"
+            />
+          </div>
         </div>
         <Button
           size="sm"
           onClick={() => onAvancar('PROGRAMADO')}
-          disabled={!motoristaId || !veiculoId || isPending}
+          disabled={!podeProgramar || isPending}
         >
           Programar Frete
         </Button>
@@ -631,28 +689,23 @@ function TransitionForm({
     )
   }
 
+  // Item 11: AGUARDANDO_LIBERACAO — transição agora vem da página de Pagamentos
   if (status === 'AGUARDANDO_LIBERACAO') {
     return (
-      <Button
-        size="sm"
-        className="bg-green-600 hover:bg-green-700 text-white"
-        onClick={() => onAvancar('EM_VIAGEM')}
-        disabled={isPending || !dadosBancariosConferidos}
-      >
-        {dadosBancariosConferidos
-          ? 'Pagamento Realizado — Liberar para Viagem'
-          : 'Confirme os dados bancários abaixo para liberar'}
-      </Button>
+      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+        <Info className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+        <p>
+          Confira os documentos abaixo e acesse{' '}
+          <span className="font-medium text-amber-700">Pagamentos</span>{' '}
+          para confirmar o adiantamento e liberar a viagem automaticamente.
+        </p>
+      </div>
     )
   }
 
   if (status === 'EM_VIAGEM') {
     return (
-      <Button
-        size="sm"
-        onClick={() => onAvancar('CONCLUIDA')}
-        disabled={isPending}
-      >
+      <Button size="sm" onClick={() => onAvancar('CONCLUIDA')} disabled={isPending}>
         Finalizar Viagem
       </Button>
     )
@@ -663,74 +716,70 @@ function TransitionForm({
 
 // ─── Painel de Liberação ─────────────────────────────────────────────────────
 
-function LiberacaoPanel({
-  frete,
-  onConferido,
-}: {
-  frete: FreteCompleto
-  onConferido: (v: boolean) => void
-}) {
+function LiberacaoPanel({ frete }: { frete: FreteCompleto }) {
+  // Item 6: checkboxes interativos para cada item do checklist
+  const [grConferido, setGrConferido] = useState(false)
+  const [cteConferido, setCteConferido] = useState(false)
+  const [contratoConferido, setContratoConferido] = useState(false)
+  const [ciotConferido, setCiotConferido] = useState(false)
   const [bancarioConferido, setBancarioConferido] = useState(false)
+
   const m = frete.motoristas
   const v = frete.veiculos
-
   const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
 
-  function handleBancarioChange(checked: boolean) {
-    setBancarioConferido(checked)
-    onConferido(checked)
-  }
-
   const checklistItems = [
-    { label: 'N° GR (seguro)', value: frete.numero_gr, key: 'gr' },
-    { label: 'Chave CT-e', value: frete.chave_cte, key: 'cte' },
-    { label: 'N° Contrato', value: frete.numero_contrato, key: 'contrato' },
-    { label: 'CIOT', value: frete.numero_ciot, key: 'ciot' },
+    { label: 'N° GR (seguro)', value: frete.numero_gr, checked: grConferido, onChange: setGrConferido, id: 'gr' },
+    { label: 'N° CT-e', value: frete.chave_cte ? `...${frete.chave_cte.slice(-8)}` : null, checked: cteConferido, onChange: setCteConferido, id: 'cte' },
+    { label: 'N° Contrato', value: frete.numero_contrato, checked: contratoConferido, onChange: setContratoConferido, id: 'contrato' },
+    { label: 'CIOT', value: frete.numero_ciot, checked: ciotConferido, onChange: setCiotConferido, id: 'ciot' },
   ]
+
+  const todosConferidos = grConferido && cteConferido && contratoConferido && ciotConferido && bancarioConferido
 
   return (
     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4">
       <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-800">
         <FileText className="h-4 w-4" />
         Conferência de Liberação
+        {todosConferidos && <span className="text-green-700 text-xs font-normal">✓ Todos itens conferidos</span>}
       </h3>
 
-      {/* Checklist de documentos */}
+      {/* Checkboxes interativos */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documentos</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marque cada item após conferência</p>
         {checklistItems.map((item) => (
-          <div key={item.key} className="flex items-start gap-2 text-sm">
-            {item.value ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-            ) : (
-              <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-            )}
-            <span className="font-medium min-w-[110px]">{item.label}:</span>
+          <div key={item.id} className="flex items-start gap-2 text-sm">
+            <Checkbox
+              id={`check-${item.id}`}
+              checked={item.checked}
+              onCheckedChange={(v) => item.onChange(v === true)}
+              className="mt-0.5"
+              disabled={!item.value}
+            />
+            <label htmlFor={`check-${item.id}`} className="font-medium min-w-[110px] cursor-pointer select-none">
+              {item.label}:
+            </label>
             <span className="font-mono text-xs text-muted-foreground break-all">
               {item.value ?? <span className="text-red-500 italic">não registrado</span>}
             </span>
           </div>
         ))}
 
-        {/* Checkbox manual — dados bancários */}
         <div className="flex items-start gap-2 pt-1">
           <Checkbox
             id="bancario-conferido"
             checked={bancarioConferido}
-            onCheckedChange={(checked) => handleBancarioChange(checked === true)}
+            onCheckedChange={(v) => setBancarioConferido(v === true)}
             className="mt-0.5"
           />
-          <label
-            htmlFor="bancario-conferido"
-            className="text-sm font-medium cursor-pointer select-none"
-          >
+          <label htmlFor="bancario-conferido" className="text-sm font-medium cursor-pointer select-none">
             Dados bancários do proprietário conferidos
           </label>
         </div>
       </div>
 
       <div className="border-t border-amber-200 pt-3 grid grid-cols-2 gap-4 text-sm">
-        {/* Motorista */}
         {m && (
           <div className="space-y-1">
             <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Motorista</p>
@@ -744,7 +793,6 @@ function LiberacaoPanel({
           </div>
         )}
 
-        {/* Adiantamento */}
         <div className="space-y-1">
           <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Adiantamento</p>
           {frete.valor_adiantamento ? (
@@ -754,9 +802,13 @@ function LiberacaoPanel({
           ) : (
             <p className="text-muted-foreground italic">Não informado</p>
           )}
+          {frete.custo_agregado && (
+            <p className="text-xs text-muted-foreground">
+              Custo total: R$ {frete.custo_agregado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          )}
         </div>
 
-        {/* Dados bancários para pagamento — lógica de proprietário */}
         {motoristaPropriétario ? (
           (m && (m.banco || m.agencia_conta || m.chave_pix)) ? (
             <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
@@ -770,7 +822,6 @@ function LiberacaoPanel({
           ) : null
         ) : (
           <>
-            {/* Proprietário do veículo — destinatário do pagamento */}
             {v && (v.banco_proprietario || v.agencia_conta_proprietario || v.chave_pix_proprietario) && (
               <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
                 <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
@@ -782,8 +833,6 @@ function LiberacaoPanel({
                 {v.chave_pix_proprietario && <p className="text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
               </div>
             )}
-
-            {/* Dados bancários do motorista — apenas informativo */}
             {m && (m.banco || m.agencia_conta || m.chave_pix) && (
               <div className="col-span-2 space-y-1">
                 <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -804,17 +853,12 @@ function LiberacaoPanel({
 
 // ─── Formulário de cancelamento ───────────────────────────────────────────────
 
-function CancelForm({
-  onConfirm,
-  onCancel,
-  loading,
-}: {
+function CancelForm({ onConfirm, onCancel, loading }: {
   onConfirm: (motivo: string) => void
   onCancel: () => void
   loading: boolean
 }) {
   const [motivo, setMotivo] = useState('')
-
   return (
     <div className="p-3 border border-destructive/30 rounded-lg bg-destructive/5 space-y-3">
       <p className="text-sm font-medium text-destructive">Confirmar cancelamento</p>
@@ -825,12 +869,7 @@ function CancelForm({
         onChange={(e) => setMotivo(e.target.value)}
       />
       <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => onConfirm(motivo)}
-          disabled={!motivo.trim() || loading}
-        >
+        <Button size="sm" variant="destructive" onClick={() => onConfirm(motivo)} disabled={!motivo.trim() || loading}>
           Confirmar
         </Button>
         <Button size="sm" variant="outline" onClick={onCancel}>Voltar</Button>

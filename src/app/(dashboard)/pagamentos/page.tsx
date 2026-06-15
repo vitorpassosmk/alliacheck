@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -8,23 +8,43 @@ import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ShieldAlert } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { MapPin, Calendar, CreditCard, CheckCircle2 } from 'lucide-react'
+import { MapPin, Calendar, CreditCard, CheckCircle2, Truck } from 'lucide-react'
 import type { FreteComRelacoes } from '@/services/fretes.service'
 
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
-async function fetchPendentes(): Promise<FreteComRelacoes[]> {
+async function fetchAdiantamentosPendentes(): Promise<FreteComRelacoes[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('fretes')
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
-      veiculos(placa, tipo, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      motoristas(nome, banco, agencia_conta, chave_pix, cpf),
+      veiculos(placa, tipo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+    `)
+    .eq('status', 'AGUARDANDO_LIBERACAO')
+    .is('adiantamento_pago_em', null)
+    .not('valor_adiantamento', 'is', null)
+    .order('atualizado_em', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []) as FreteComRelacoes[]
+}
+
+async function fetchPagamentosFinalPendentes(): Promise<FreteComRelacoes[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('fretes')
+    .select(`
+      *,
+      clientes(razao_social),
+      motoristas(nome, banco, agencia_conta, chave_pix, cpf),
+      veiculos(placa, tipo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .eq('status', 'CONCLUIDA')
     .is('pago_em', null)
@@ -41,8 +61,8 @@ async function fetchPagos(): Promise<FreteComRelacoes[]> {
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
-      veiculos(placa, tipo, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      motoristas(nome),
+      veiculos(placa, tipo)
     `)
     .eq('status', 'CONCLUIDA')
     .not('pago_em', 'is', null)
@@ -58,63 +78,135 @@ async function fetchPagos(): Promise<FreteComRelacoes[]> {
 // ---------------------------------------------------------------------------
 
 export default function PagamentosPage() {
-  const { data: pendentes = [], isLoading: loadingPendentes } = useQuery({
-    queryKey: ['pagamentos', 'pendentes'],
-    queryFn: fetchPendentes,
+  const supabase = createClient()
+  const [papel, setPapel] = useState<string | null>(null)
+  const [papelCarregado, setPapelCarregado] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
+      setPapel(data?.papel ?? null)
+      setPapelCarregado(true)
+    })
+  }, [])
+
+  const { data: adiantamentos = [], isLoading: loadingAdiantamentos } = useQuery({
+    queryKey: ['pagamentos', 'adiantamentos'],
+    queryFn: fetchAdiantamentosPendentes,
+    enabled: papelCarregado && papel !== 'CONFERENTE',
+  })
+
+  const { data: finaisPendentes = [], isLoading: loadingFinais } = useQuery({
+    queryKey: ['pagamentos', 'finais-pendentes'],
+    queryFn: fetchPagamentosFinalPendentes,
+    enabled: papelCarregado && papel !== 'CONFERENTE',
   })
 
   const { data: pagos = [], isLoading: loadingPagos } = useQuery({
     queryKey: ['pagamentos', 'pagos'],
     queryFn: fetchPagos,
+    enabled: papelCarregado && papel !== 'CONFERENTE',
   })
 
-  const isLoading = loadingPendentes || loadingPagos
+  if (!papelCarregado) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
+
+  if (papel === 'CONFERENTE') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+        <ShieldAlert className="h-10 w-10" />
+        <p className="text-sm font-medium">Acesso restrito</p>
+        <p className="text-xs">Apenas ADMINs e SUPERVISORs podem acessar a área de Pagamentos.</p>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold">Pagamentos</h1>
-        <p className="text-sm text-muted-foreground">Gerencie os pagamentos de viagens concluídas</p>
+        <p className="text-sm text-muted-foreground">Gerencie adiantamentos e pagamentos finais de fretes</p>
       </div>
 
-      {/* Pendentes */}
+      {/* Seção 1: Adiantamentos Pendentes */}
       <section className="space-y-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-medium">Aguardando pagamento</h2>
-          {!isLoading && pendentes.length > 0 && (
+          <h2 className="text-base font-medium">Adiantamentos Pendentes</h2>
+          {!loadingAdiantamentos && adiantamentos.length > 0 && (
             <Badge variant="destructive" className="rounded-full px-2 py-0 text-xs">
-              {pendentes.length}
+              {adiantamentos.length}
             </Badge>
           )}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Fretes aguardando confirmação do adiantamento. Confirmar libera automaticamente a viagem.
+        </p>
 
-        {loadingPendentes ? (
+        {loadingAdiantamentos ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
+            {[1, 2].map((i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
           </div>
-        ) : pendentes.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
-            Nenhuma viagem aguardando pagamento
+        ) : adiantamentos.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
+            Nenhum adiantamento pendente
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pendentes.map((frete) => (
-              <FreteCardPendente key={frete.id} frete={frete} />
+            {adiantamentos.map((frete) => (
+              <FreteCardAdiantamento key={frete.id} frete={frete} />
             ))}
           </div>
         )}
       </section>
 
-      {/* Histórico de pagos */}
+      {/* Seção 2: Pagamentos Finais Pendentes */}
       <section className="space-y-3">
-        <h2 className="text-base font-medium">Histórico de pagamentos</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-medium">Pagamentos Finais Pendentes</h2>
+          {!loadingFinais && finaisPendentes.length > 0 && (
+            <Badge variant="destructive" className="rounded-full px-2 py-0 text-xs">
+              {finaisPendentes.length}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Viagens concluídas aguardando pagamento do saldo restante ao proprietário.
+        </p>
+
+        {loadingFinais ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
+          </div>
+        ) : finaisPendentes.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
+            Nenhuma viagem aguardando pagamento final
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {finaisPendentes.map((frete) => (
+              <FreteCardPagamentoFinal key={frete.id} frete={frete} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Seção 3: Histórico */}
+      <section className="space-y-3">
+        <h2 className="text-base font-medium">Histórico de Pagamentos</h2>
 
         {loadingPagos ? (
           <div className="space-y-3">
             {[1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
         ) : pagos.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
+          <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
             Nenhum pagamento registrado ainda
           </div>
         ) : (
@@ -130,10 +222,10 @@ export default function PagamentosPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Card — pendente de pagamento
+// Card — adiantamento pendente (Item 11 — Seção 1)
 // ---------------------------------------------------------------------------
 
-function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
+function FreteCardAdiantamento({ frete }: { frete: FreteComRelacoes }) {
   const [dialogAberto, setDialogAberto] = useState(false)
   const [loading, setLoading] = useState(false)
   const queryClient = useQueryClient()
@@ -142,15 +234,11 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
     setLoading(true)
     try {
       const supabase = createClient()
-
-      // 1. Busca o e-mail do usuário atual
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError || !userData.user?.email) {
         toast.error('Não foi possível identificar o usuário.')
         return
       }
-
-      // 2. Verifica a senha
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: userData.user.email,
         password: senha,
@@ -160,7 +248,155 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
         return
       }
 
-      // 3. Registra o pagamento via API
+      const res = await fetch(`/api/fretes/${frete.id}/adiantamento`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        toast.error(body.error ?? 'Erro ao confirmar adiantamento.')
+        return
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['pagamentos'] })
+      await queryClient.invalidateQueries({ queryKey: ['fretes'] })
+      toast.success('Adiantamento confirmado! Frete liberado para EM VIAGEM.')
+      setDialogAberto(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const m = frete.motoristas
+  const v = frete.veiculos
+  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
+
+  return (
+    <>
+      <Card className="border border-amber-200 bg-amber-50">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <span className="font-bold tracking-wide text-amber-900">
+              PEDIDO: {frete.numero_frete}
+            </span>
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 shrink-0">
+              Adiantamento
+            </Badge>
+          </div>
+
+          {frete.clientes && (
+            <p className="text-sm font-medium truncate">{frete.clientes.razao_social}</p>
+          )}
+
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}
+            </span>
+          </div>
+
+          {m && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Truck className="h-3 w-3 shrink-0" />
+              <span>{m.nome} — {v?.placa}</span>
+            </div>
+          )}
+
+          {/* Valor do adiantamento destacado */}
+          {frete.valor_adiantamento && (
+            <div className="bg-white border border-amber-200 rounded-md p-3">
+              <p className="text-xs text-muted-foreground">Valor do adiantamento</p>
+              <p className="text-xl font-bold text-amber-900">
+                R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              {frete.custo_agregado && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Custo total: R$ {frete.custo_agregado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Dados bancários */}
+          {motoristaPropriétario ? (
+            m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) && (
+              <div className="border-t pt-2 space-y-1">
+                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                  <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
+                </p>
+                {(m as { banco?: string }).banco && (
+                  <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
+                )}
+                {(m as { chave_pix?: string }).chave_pix && (
+                  <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
+                )}
+              </div>
+            )
+          ) : (
+            v && (v.banco_proprietario || v.chave_pix_proprietario) && (
+              <div className="border-t pt-2 space-y-1">
+                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                  <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
+                </p>
+                {v.banco_proprietario && (
+                  <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
+                )}
+                {v.chave_pix_proprietario && (
+                  <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
+                )}
+              </div>
+            )
+          )}
+
+          <div className="border-t pt-3">
+            <Button
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+              size="sm"
+              onClick={() => setDialogAberto(true)}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+              Confirmar Adiantamento e Liberar Viagem
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <PasswordConfirmDialog
+        open={dialogAberto}
+        onOpenChange={setDialogAberto}
+        onConfirm={handleConfirmar}
+        loading={loading}
+        title="Confirmar Adiantamento"
+        description={`Confirme sua senha para registrar o adiantamento do frete ${frete.numero_frete} e liberar a viagem.`}
+      />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Card — pagamento final pendente (Item 11 — Seção 2)
+// ---------------------------------------------------------------------------
+
+function FreteCardPagamentoFinal({ frete }: { frete: FreteComRelacoes }) {
+  const [dialogAberto, setDialogAberto] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
+
+  async function handleConfirmar(senha: string) {
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData.user?.email) {
+        toast.error('Não foi possível identificar o usuário.')
+        return
+      }
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: senha,
+      })
+      if (authError) {
+        toast.error('Senha incorreta. Tente novamente.')
+        return
+      }
+
       const res = await fetch(`/api/fretes/${frete.id}/pagamento`, { method: 'POST' })
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }))
@@ -168,11 +404,9 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
         return
       }
 
-      // 4. Invalida as queries para recarregar listas
       await queryClient.invalidateQueries({ queryKey: ['pagamentos'] })
       await queryClient.invalidateQueries({ queryKey: ['fretes'] })
-
-      toast.success('Pagamento confirmado com sucesso!')
+      toast.success('Pagamento final confirmado com sucesso!')
       setDialogAberto(false)
     } finally {
       setLoading(false)
@@ -186,24 +420,30 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
       })
     : null
 
+  const restante = frete.custo_agregado && frete.valor_adiantamento
+    ? frete.custo_agregado - frete.valor_adiantamento
+    : frete.custo_agregado ?? null
+
+  const m = frete.motoristas
+  const v = frete.veiculos
+
   return (
     <>
       <Card className="border bg-white">
         <CardContent className="p-4 space-y-3">
-          {/* Cabeçalho */}
           <div className="flex items-start justify-between gap-2">
-            <span className="font-bold font-mono text-[#3B6D11] text-lg">{frete.numero_frete}</span>
+            <span className="font-bold tracking-wide text-[#3B6D11]">
+              PEDIDO: {frete.numero_frete}
+            </span>
             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 shrink-0">
-              Pendente
+              Pag. Final
             </Badge>
           </div>
 
-          {/* Cliente */}
           {frete.clientes && (
             <p className="text-sm font-medium truncate">{frete.clientes.razao_social}</p>
           )}
 
-          {/* Rota */}
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">
@@ -211,7 +451,6 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
             </span>
           </div>
 
-          {/* Data conclusão */}
           {dataConclusao && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3 shrink-0" />
@@ -219,57 +458,68 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
             </div>
           )}
 
-          {/* Valores */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {frete.valor_mercadoria && (
-              <div className="bg-gray-50 rounded p-2">
-                <p className="text-muted-foreground">Mercadoria</p>
-                <p className="font-semibold">
-                  R$ {frete.valor_mercadoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
+          {/* Item 11: detalhe financeiro — custo, adiantamento, restante */}
+          <div className="bg-gray-50 rounded-md p-3 space-y-2 text-xs">
+            {frete.custo_agregado && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Custo Agregado</span>
+                <span className="font-medium">
+                  R$ {frete.custo_agregado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
               </div>
             )}
-            {frete.valor_frete && (
-              <div className="bg-gray-50 rounded p-2">
-                <p className="text-muted-foreground">Frete</p>
-                <p className="font-semibold">
+            {frete.valor_adiantamento && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>(-) Adiantamento pago</span>
+                <span>R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {restante !== null && (
+              <div className="flex justify-between border-t pt-2 font-semibold text-[#3B6D11]">
+                <span>Saldo a pagar</span>
+                <span>R$ {restante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            {!frete.custo_agregado && frete.valor_frete && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor do frete</span>
+                <span className="font-medium">
                   R$ {frete.valor_frete.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
+                </span>
               </div>
             )}
           </div>
 
-          {/* Dados bancários do motorista */}
-          {frete.motoristas && (frete.motoristas.banco || frete.motoristas.chave_pix) && (
+          {/* Dados bancários do proprietário do veículo */}
+          {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
             <div className="border-t pt-2 space-y-1">
               <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3 w-3" /> Banco — {frete.motoristas.nome}
+                <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
               </p>
-              {frete.motoristas.banco && (
-                <p className="text-xs">{frete.motoristas.banco} · {frete.motoristas.agencia_conta}</p>
+              {v.banco_proprietario && (
+                <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
               )}
-              {frete.motoristas.chave_pix && (
-                <p className="text-xs text-muted-foreground">PIX: {frete.motoristas.chave_pix}</p>
+              {v.chave_pix_proprietario && (
+                <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
               )}
             </div>
           )}
 
-          {/* Dados bancários do proprietário */}
-          {frete.veiculos && (frete.veiculos.banco_proprietario || frete.veiculos.chave_pix_proprietario) && (
+          {/* Dados bancários do motorista (fallback) */}
+          {m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) && (
             <div className="border-t pt-2 space-y-1">
               <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3 w-3" /> Banco — Proprietário ({frete.veiculos.placa})
+                <CreditCard className="h-3 w-3" /> Banco — {m.nome}
               </p>
-              {frete.veiculos.banco_proprietario && (
-                <p className="text-xs">{frete.veiculos.banco_proprietario} · {frete.veiculos.agencia_conta_proprietario}</p>
+              {(m as { banco?: string }).banco && (
+                <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
               )}
-              {frete.veiculos.chave_pix_proprietario && (
-                <p className="text-xs text-muted-foreground">PIX: {frete.veiculos.chave_pix_proprietario}</p>
+              {(m as { chave_pix?: string }).chave_pix && (
+                <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
               )}
             </div>
           )}
 
-          {/* Botão confirmar pagamento */}
           <div className="border-t pt-3">
             <Button
               className="w-full bg-teal-600 hover:bg-teal-700 text-white"
@@ -277,7 +527,7 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
               onClick={() => setDialogAberto(true)}
             >
               <CheckCircle2 className="h-4 w-4 mr-1.5" />
-              Confirmar Pagamento
+              Confirmar Pagamento Final
             </Button>
           </div>
         </CardContent>
@@ -288,15 +538,15 @@ function FreteCardPendente({ frete }: { frete: FreteComRelacoes }) {
         onOpenChange={setDialogAberto}
         onConfirm={handleConfirmar}
         loading={loading}
-        title="Confirmar pagamento"
-        description={`Confirme sua senha para registrar o pagamento do frete ${frete.numero_frete}.`}
+        title="Confirmar Pagamento Final"
+        description={`Confirme sua senha para registrar o pagamento final do frete ${frete.numero_frete}.`}
       />
     </>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Card — já pago
+// Card — já pago (Seção 3 — Histórico)
 // ---------------------------------------------------------------------------
 
 function FreteCardPago({ frete }: { frete: FreteComRelacoes }) {
@@ -310,20 +560,19 @@ function FreteCardPago({ frete }: { frete: FreteComRelacoes }) {
   return (
     <Card className="border bg-white opacity-80">
       <CardContent className="p-4 space-y-3">
-        {/* Cabeçalho */}
         <div className="flex items-start justify-between gap-2">
-          <span className="font-bold font-mono text-[#3B6D11] text-lg">{frete.numero_frete}</span>
+          <span className="font-bold tracking-wide text-[#3B6D11]">
+            PEDIDO: {frete.numero_frete}
+          </span>
           <Badge variant="outline" className="bg-[#EAF3DE] text-[#3B6D11] border-[#3B6D11]/20 shrink-0">
             Pago
           </Badge>
         </div>
 
-        {/* Cliente */}
         {frete.clientes && (
           <p className="text-sm font-medium truncate">{frete.clientes.razao_social}</p>
         )}
 
-        {/* Rota */}
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">
@@ -331,7 +580,6 @@ function FreteCardPago({ frete }: { frete: FreteComRelacoes }) {
           </span>
         </div>
 
-        {/* Data pagamento */}
         {dataPagamento && (
           <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
             <CheckCircle2 className="h-3 w-3 shrink-0" />
@@ -339,13 +587,12 @@ function FreteCardPago({ frete }: { frete: FreteComRelacoes }) {
           </div>
         )}
 
-        {/* Valores */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          {frete.valor_mercadoria && (
+          {frete.custo_agregado && (
             <div className="bg-gray-50 rounded p-2">
-              <p className="text-muted-foreground">Mercadoria</p>
+              <p className="text-muted-foreground">Custo Agregado</p>
               <p className="font-semibold">
-                R$ {frete.valor_mercadoria.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {frete.custo_agregado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
           )}

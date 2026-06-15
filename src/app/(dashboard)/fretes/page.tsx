@@ -76,6 +76,7 @@ export default function FretesPage() {
       const q = busca.toLowerCase()
       return (
         f.id.slice(-6).includes(q) ||
+        f.numero_frete?.toLowerCase().includes(q) ||
         f.origem_cidade.toLowerCase().includes(q) ||
         f.destino_cidade.toLowerCase().includes(q) ||
         f.clientes?.razao_social.toLowerCase().includes(q) ||
@@ -106,7 +107,7 @@ export default function FretesPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por ID, cliente, rota, motorista, placa..."
+            placeholder="Buscar por número, ID, cliente, rota, motorista, placa..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="pl-9"

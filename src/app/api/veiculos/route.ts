@@ -13,6 +13,7 @@ const VeiculoSchema = z.object({
   tem_placas_separadas: z.boolean().optional(),
   placa_carreta: z.string().nullable().optional(),
   cpf_proprietario: z.string().nullable().optional(),
+  cnpj_proprietario: z.string().nullable().optional(),
   banco_proprietario: z.string().nullable().optional(),
   agencia_conta_proprietario: z.string().nullable().optional(),
   chave_pix_proprietario: z.string().nullable().optional(),
@@ -32,6 +33,11 @@ export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
+  }
 
   const body = await request.json()
   const parsed = VeiculoSchema.safeParse(body)

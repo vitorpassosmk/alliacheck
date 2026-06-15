@@ -21,14 +21,15 @@ export async function GET() {
     return Response.json({ error: 'Apenas ADMINs e SUPERVISORs podem listar usuários' }, { status: 403 })
   }
 
-  const { data, error } = await supabase
+  const admin = createAdminClient()
+
+  const { data, error } = await admin
     .from('users')
     .select('id, nome, papel, telefone, ativo, criado_em')
     .order('criado_em', { ascending: false })
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
 
-  const admin = createAdminClient()
   const { data: authUsers } = await admin.auth.admin.listUsers()
   const emailMap = new Map(authUsers.users.map((u: User) => [u.id, u.email]))
 
@@ -42,8 +43,8 @@ export async function POST(request: Request) {
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
-  if (perfil?.papel !== 'ADMIN') {
-    return Response.json({ error: 'Apenas ADMINs podem criar usuários' }, { status: 403 })
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Apenas ADMINs e SUPERVISORs podem criar usuários' }, { status: 403 })
   }
 
   const body = await request.json()

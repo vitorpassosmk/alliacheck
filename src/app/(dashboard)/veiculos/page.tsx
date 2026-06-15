@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -14,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
+import { validarCNPJ, formatarCNPJ } from '@/lib/validations/cnpj'
 import type { Tables } from '@/types/database.types'
 
 const TIPOS_VEICULO = ['VAN', 'TOCO', 'TRUCK', 'BITRUCK', 'CARRETA', 'CARRETA_LS', 'BITREM'] as const
@@ -40,6 +42,7 @@ const VeiculoSchema = z.object({
   tem_placas_separadas: z.boolean().optional(),
   placa_carreta: z.string().optional(),
   cpf_proprietario: z.string().optional(),
+  cnpj_proprietario: z.string().optional(),
   banco_proprietario: z.string().optional(),
   agencia_conta_proprietario: z.string().optional(),
   chave_pix_proprietario: z.string().optional(),
@@ -51,6 +54,17 @@ export default function VeiculosPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Tables<'veiculos'> | null>(null)
+  const [tipoDocProprietario, setTipoDocProprietario] = useState<'CPF' | 'CNPJ'>('CPF')
+  const [podeGerenciar, setPodeGerenciar] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
+      setPodeGerenciar(data?.papel === 'ADMIN' || data?.papel === 'SUPERVISOR')
+    })
+  }, [])
 
   const { data: veiculos = [], isLoading } = useQuery<Tables<'veiculos'>[]>({
     queryKey: ['veiculos'],
@@ -62,7 +76,8 @@ export default function VeiculosPage() {
     defaultValues: {
       placa: '', tipo: 'CARRETA', modelo: '', ano: '', proprietario: '',
       tipo_veiculo: null, tem_placas_separadas: false, placa_carreta: '',
-      cpf_proprietario: '', banco_proprietario: '', agencia_conta_proprietario: '', chave_pix_proprietario: '',
+      cpf_proprietario: '', cnpj_proprietario: '',
+      banco_proprietario: '', agencia_conta_proprietario: '', chave_pix_proprietario: '',
     },
   })
 
@@ -96,6 +111,8 @@ export default function VeiculosPage() {
 
   const abrirEdicao = (v: Tables<'veiculos'>) => {
     setEditando(v)
+    const temCnpj = !!v.cnpj_proprietario
+    setTipoDocProprietario(temCnpj ? 'CNPJ' : 'CPF')
     form.reset({
       placa: v.placa,
       tipo: v.tipo,
@@ -106,6 +123,7 @@ export default function VeiculosPage() {
       tem_placas_separadas: v.tem_placas_separadas ?? false,
       placa_carreta: v.placa_carreta ?? '',
       cpf_proprietario: v.cpf_proprietario ?? '',
+      cnpj_proprietario: v.cnpj_proprietario ?? '',
       banco_proprietario: v.banco_proprietario ?? '',
       agencia_conta_proprietario: v.agencia_conta_proprietario ?? '',
       chave_pix_proprietario: v.chave_pix_proprietario ?? '',
@@ -113,15 +131,17 @@ export default function VeiculosPage() {
     setModalOpen(true)
   }
 
-  const fecharModal = () => { setModalOpen(false); setEditando(null); form.reset() }
+  const fecharModal = () => { setModalOpen(false); setEditando(null); form.reset(); setTipoDocProprietario('CPF') }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Veículos</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Novo Veículo
-        </Button>
+        {podeGerenciar && (
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Novo Veículo
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -147,7 +167,9 @@ export default function VeiculosPage() {
                   {v.proprietario && <><span>·</span><span>{v.proprietario}</span></>}
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={() => abrirEdicao(v)}>Editar</Button>
+              {podeGerenciar && (
+                <Button variant="outline" size="sm" onClick={() => abrirEdicao(v)}>Editar</Button>
+              )}
             </div>
           ))}
           {veiculos.length === 0 && (
@@ -256,9 +278,59 @@ export default function VeiculosPage() {
                 <FormField control={form.control} name="proprietario" render={({ field }) => (
                   <FormItem><FormLabel>Nome do Proprietário</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="cpf_proprietario" render={({ field }) => (
-                  <FormItem><FormLabel>CPF do Proprietário</FormLabel><FormControl><Input placeholder="000.000.000-00" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+
+                {/* Item 7: toggle CPF / CNPJ do proprietário */}
+                <FormItem>
+                  <FormLabel>Documento do Proprietário</FormLabel>
+                  <div className="flex rounded-md overflow-hidden border text-sm">
+                    <button
+                      type="button"
+                      onClick={() => { setTipoDocProprietario('CPF'); form.setValue('cnpj_proprietario', '') }}
+                      className={`flex-1 px-3 py-1.5 font-medium transition-colors ${tipoDocProprietario === 'CPF' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}
+                    >
+                      CPF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTipoDocProprietario('CNPJ'); form.setValue('cpf_proprietario', '') }}
+                      className={`flex-1 px-3 py-1.5 font-medium transition-colors ${tipoDocProprietario === 'CNPJ' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}
+                    >
+                      CNPJ
+                    </button>
+                  </div>
+                </FormItem>
+
+                {tipoDocProprietario === 'CPF' ? (
+                  <FormField control={form.control} name="cpf_proprietario" render={({ field }) => (
+                    <FormItem className="col-span-1">
+                      <FormLabel>CPF</FormLabel>
+                      <FormControl><Input placeholder="000.000.000-00" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="cnpj_proprietario"
+                    rules={{
+                      validate: (v) => !v || validarCNPJ(v) || 'CNPJ inválido',
+                    }}
+                    render={({ field }) => (
+                      <FormItem className="col-span-1">
+                        <FormLabel>CNPJ</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="00.000.000/0001-00"
+                            value={field.value ?? ''}
+                            onChange={(e) => field.onChange(formatarCNPJ(e.target.value))}
+                            maxLength={18}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )
               </div>
 
               {/* Dados Bancários do Proprietário */}

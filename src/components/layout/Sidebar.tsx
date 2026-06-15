@@ -15,9 +15,11 @@ import {
   BarChart3,
   UserCog,
   Banknote,
+  CircleUser,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
+import { MinhaContaModal } from './MinhaContaModal'
 
 type Papel = 'ADMIN' | 'SUPERVISOR' | 'CONFERENTE'
 
@@ -34,9 +36,9 @@ const navItems: NavItem[] = [
   { href: '/motoristas', label: 'Motoristas', icon: Users },
   { href: '/veiculos', label: 'Veículos', icon: Truck },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
-  { href: '/pagamentos', label: 'Pagamentos', icon: Banknote },
+  { href: '/pagamentos', label: 'Pagamentos', icon: Banknote, somente: ['ADMIN', 'SUPERVISOR'] as Papel[] },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
-  { href: '/usuarios', label: 'Usuários', icon: UserCog, somente: ['ADMIN'] },
+  { href: '/usuarios', label: 'Usuários', icon: UserCog, somente: ['ADMIN', 'SUPERVISOR'] as Papel[] },
 ]
 
 const labelPapel: Record<Papel, string> = {
@@ -45,17 +47,36 @@ const labelPapel: Record<Papel, string> = {
   CONFERENTE: 'Conferente',
 }
 
+type UsuarioLogado = {
+  id: string
+  nome: string
+  email: string
+  papel: Papel
+  telefone: string | null
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const [papel, setPapel] = useState<Papel | null>(null)
+  const [usuarioLogado, setUsuarioLogado] = useState<UsuarioLogado | null>(null)
+  const [minhaContaAberta, setMinhaContaAberta] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
-      if (data) setPapel(data.papel as Papel)
+      const { data } = await supabase.from('users').select('nome, papel, telefone').eq('id', user.id).single()
+      if (data) {
+        setPapel(data.papel as Papel)
+        setUsuarioLogado({
+          id: user.id,
+          nome: data.nome,
+          email: user.email ?? '',
+          papel: data.papel as Papel,
+          telefone: data.telefone ?? null,
+        })
+      }
     })
   }, [])
 
@@ -114,8 +135,16 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Logout */}
-      <div className="p-3 border-t border-white/10">
+      {/* Minha Conta + Logout */}
+      <div className="p-3 border-t border-white/10 space-y-0.5">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 text-slate-400 hover:text-white hover:bg-white/5"
+          onClick={() => setMinhaContaAberta(true)}
+        >
+          <CircleUser className="h-4 w-4" />
+          Minha Conta
+        </Button>
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-slate-400 hover:text-red-400 hover:bg-red-500/10"
@@ -131,6 +160,17 @@ export function Sidebar() {
         powered by{' '}
         <span className="font-medium text-slate-500">ALLiA Lab</span>
       </div>
+
+      {usuarioLogado && (
+        <MinhaContaModal
+          open={minhaContaAberta}
+          onClose={() => setMinhaContaAberta(false)}
+          userId={usuarioLogado.id}
+          nomeAtual={usuarioLogado.nome}
+          emailAtual={usuarioLogado.email}
+          telefoneAtual={usuarioLogado.telefone}
+        />
+      )}
     </aside>
   )
 }

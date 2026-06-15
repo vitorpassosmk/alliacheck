@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -35,6 +36,16 @@ export default function MotoristasPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Tables<'motoristas'> | null>(null)
+  const [podeGerenciar, setPodeGerenciar] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
+      setPodeGerenciar(data?.papel === 'ADMIN' || data?.papel === 'SUPERVISOR')
+    })
+  }, [])
 
   const { data: motoristas = [], isLoading } = useQuery<Tables<'motoristas'>[]>({
     queryKey: ['motoristas'],
@@ -89,9 +100,11 @@ export default function MotoristasPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Motoristas</h1>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Novo Motorista
-        </Button>
+        {podeGerenciar && (
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Novo Motorista
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -124,7 +137,9 @@ export default function MotoristasPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant={m.status === 'ATIVO' ? 'default' : 'secondary'}>{m.status}</Badge>
-                  <Button variant="outline" size="sm" onClick={() => abrirEdicao(m)}>Editar</Button>
+                  {podeGerenciar && (
+                    <Button variant="outline" size="sm" onClick={() => abrirEdicao(m)}>Editar</Button>
+                  )}
                 </div>
               </div>
             )

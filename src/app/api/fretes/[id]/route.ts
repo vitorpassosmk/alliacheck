@@ -51,6 +51,7 @@ export async function DELETE(
 }
 
 const FreteUpdateSchema = z.object({
+  numero_frete: z.string().min(1).optional(),
   cliente_id: z.string().uuid().nullable().optional(),
   motorista_id: z.string().uuid().nullable().optional(),
   veiculo_id: z.string().uuid().nullable().optional(),
@@ -59,7 +60,10 @@ const FreteUpdateSchema = z.object({
   destino_cidade: z.string().min(1).optional(),
   destino_uf: z.string().length(2).optional(),
   tipo_veiculo: z.string().nullable().optional(),
+  tipo_produto: z.string().nullable().optional(),
   valor_frete: z.number().positive().nullable().optional(),
+  valor_mercadoria: z.number().positive().nullable().optional(),
+  custo_agregado: z.number().positive().nullable().optional(),
   data_carregamento: z.string().nullable().optional(),
   data_entrega_prevista: z.string().nullable().optional(),
   data_entrega_real: z.string().nullable().optional(),
@@ -85,7 +89,7 @@ export async function GET(
       clientes(*),
       motoristas(*),
       veiculos(*),
-      eventos(*)
+      eventos(*, users(nome, papel))
     `)
     .eq('id', id)
     .is('excluido_em', null)
@@ -130,8 +134,21 @@ export async function PATCH(
     .single()
 
   if (error) {
+    if (error.code === '23505') {
+      return Response.json({ error: 'Número de frete já está em uso' }, { status: 409 })
+    }
     console.error('[fretes/id] update error', error)
     return Response.json({ error: 'Erro interno' }, { status: 500 })
   }
+
+  await supabase.from('eventos').insert({
+    frete_id: id,
+    tipo: 'FRETE_EDITADO',
+    descricao: 'Dados do frete editados',
+    usuario_id: user.id,
+    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    user_agent: request.headers.get('user-agent'),
+  })
+
   return Response.json(data)
 }

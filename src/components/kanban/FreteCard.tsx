@@ -11,6 +11,22 @@ interface FreteCardProps {
   onClick: (frete: FreteComRelacoes) => void
 }
 
+// Item 10: após EM_VIAGEM mostrar data de entrega prevista
+function DataLabel({ frete }: { frete: FreteComRelacoes }) {
+  const status = frete.status as StatusViagem
+  const mostrarEntrega = ['EM_VIAGEM', 'CONCLUIDA'].includes(status)
+  const data = mostrarEntrega ? frete.data_entrega_prevista : frete.data_carregamento
+  const label = mostrarEntrega ? 'Prev. entrega:' : 'Carregamento:'
+
+  if (!data) return null
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Calendar className="h-3 w-3 shrink-0" />
+      <span>{label} {new Date(data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+    </div>
+  )
+}
+
 export function FreteCard({ frete, onClick }: FreteCardProps) {
   const status = frete.status as StatusViagem
 
@@ -32,9 +48,11 @@ function FreteCardAberto({ frete, onClick }: FreteCardProps) {
       onClick={() => onClick(frete)}
     >
       <CardContent className="p-3 space-y-2">
-        {/* Número do frete em destaque */}
+        {/* Item 4: PEDIDO em bold */}
         <div className="flex items-center justify-between">
-          <span className="text-base font-bold font-mono text-[#185FA5]">{frete.numero_frete}</span>
+          <span className="text-sm font-bold tracking-wide text-[#185FA5]">
+            PEDIDO: {frete.numero_frete}
+          </span>
         </div>
 
         {/* Rota */}
@@ -45,7 +63,6 @@ function FreteCardAberto({ frete, onClick }: FreteCardProps) {
           </span>
         </div>
 
-        {/* Tipo de produto */}
         {frete.tipo_produto && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Package className="h-3 w-3 shrink-0" />
@@ -53,7 +70,6 @@ function FreteCardAberto({ frete, onClick }: FreteCardProps) {
           </div>
         )}
 
-        {/* Valor da mercadoria */}
         {frete.valor_mercadoria && (
           <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700">
             <DollarSign className="h-3 w-3 shrink-0" />
@@ -61,13 +77,7 @@ function FreteCardAberto({ frete, onClick }: FreteCardProps) {
           </div>
         )}
 
-        {/* Data de carregamento */}
-        {frete.data_carregamento && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3 shrink-0" />
-            <span>{new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-          </div>
-        )}
+        <DataLabel frete={frete} />
 
         {frete.clientes && (
           <p className="text-xs text-muted-foreground truncate border-t pt-1.5">{frete.clientes.razao_social}</p>
@@ -87,7 +97,10 @@ function FreteCardLiberacao({ frete, onClick }: FreteCardProps) {
     >
       <CardContent className="p-2.5 space-y-1.5">
         <div className="flex items-center justify-between gap-1">
-          <span className="text-xs font-mono font-semibold text-amber-800">{frete.numero_frete}</span>
+          {/* Item 4: PEDIDO em bold */}
+          <span className="text-xs font-bold tracking-wide text-amber-800">
+            PEDIDO: {frete.numero_frete}
+          </span>
           <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full font-medium">
             Pag. pendente
           </span>
@@ -107,12 +120,7 @@ function FreteCardLiberacao({ frete, onClick }: FreteCardProps) {
             <span className="truncate">{frete.motoristas.nome}</span>
           </div>
         )}
-        {frete.data_carregamento && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3 shrink-0" />
-            <span>{new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-          </div>
-        )}
+        <DataLabel frete={frete} />
         {frete.valor_mercadoria && (
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-700">
             <DollarSign className="h-3 w-3 shrink-0" />
@@ -139,7 +147,10 @@ function FreteCardCompacto({ frete, onClick }: FreteCardProps) {
       onClick={() => onClick(frete)}
     >
       <CardContent className="p-2.5 space-y-1">
-        <span className="text-[11px] font-mono text-muted-foreground">{frete.numero_frete}</span>
+        {/* Item 4: PEDIDO em bold */}
+        <span className="text-xs font-bold tracking-wide text-foreground">
+          PEDIDO: {frete.numero_frete}
+        </span>
 
         {frete.clientes && (
           <p className="text-sm font-medium truncate leading-tight">{frete.clientes.razao_social}</p>
@@ -159,12 +170,7 @@ function FreteCardCompacto({ frete, onClick }: FreteCardProps) {
           </div>
         )}
 
-        {frete.data_carregamento && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3 shrink-0" />
-            <span>{new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-          </div>
-        )}
+        <DataLabel frete={frete} />
 
         {frete.valor_mercadoria && (
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-700">

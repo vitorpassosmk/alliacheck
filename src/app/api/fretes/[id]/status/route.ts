@@ -26,13 +26,13 @@ export async function PATCH(
   const body: Record<string, unknown> = await request.json()
   const novoStatus = body.status as StatusViagem
 
-  if (novoStatus === 'CANCELADO' && perfil.papel !== 'ADMIN') {
-    return Response.json({ error: 'Apenas ADMINs podem cancelar fretes' }, { status: 403 })
+  if (novoStatus === 'CANCELADO' && !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Apenas ADMIN e SUPERVISOR podem cancelar fretes' }, { status: 403 })
   }
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, numero_frete')
+    .select('status, numero_frete, data_carregamento')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -61,6 +61,24 @@ export async function PATCH(
     }
     camposAdicionais.motorista_id = motorista_id
     camposAdicionais.veiculo_id = veiculo_id
+
+    // data_carregamento: exigida aqui se não foi informada na criação do frete
+    if (!frete.data_carregamento) {
+      const data_carregamento = (body.data_carregamento as string | undefined)?.trim()
+      if (!data_carregamento) {
+        return Response.json({ error: 'Data de carregamento é obrigatória para programar o frete' }, { status: 422 })
+      }
+      camposAdicionais.data_carregamento = data_carregamento
+    }
+
+    // custo_agregado: valor total a pagar ao proprietário do caminhão
+    const custo_agregado = body.custo_agregado as number | undefined
+    if (custo_agregado !== undefined) {
+      if (custo_agregado <= 0) {
+        return Response.json({ error: 'Custo do agregado deve ser maior que zero' }, { status: 422 })
+      }
+      camposAdicionais.custo_agregado = custo_agregado
+    }
   }
 
   if (novoStatus === 'CARREGANDO') {

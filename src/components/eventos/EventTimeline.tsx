@@ -1,17 +1,21 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { Tables } from '@/types/database.types'
+import type { EventoComUsuario } from '@/types/database.types'
 
 const tipoLabel: Record<string, { label: string; cor: string }> = {
   FRETE_CRIADO:       { label: 'Frete criado',          cor: 'bg-blue-500' },
+  FRETE_EDITADO:      { label: 'Frete editado',          cor: 'bg-sky-500' },
+  FRETE_EXCLUIDO:     { label: 'Frete excluído',         cor: 'bg-red-500' },
   STATUS_CHANGE:      { label: 'Status alterado',        cor: 'bg-violet-500' },
   CTE_STATUS_CHANGE:  { label: 'CT-e status alterado',   cor: 'bg-indigo-500' },
+  ADIANTAMENTO_PAGO:  { label: 'Adiantamento pago',      cor: 'bg-amber-500' },
+  PAGAMENTO_FINAL:    { label: 'Pagamento final',         cor: 'bg-teal-500' },
   DOCUMENTO_ANEXADO:  { label: 'Documento anexado',      cor: 'bg-green-500' },
   CHECKLIST_ITEM:     { label: 'Item conferido',         cor: 'bg-teal-500' },
 }
 
 interface EventTimelineProps {
-  eventos: Tables<'eventos'>[]
+  eventos: EventoComUsuario[]
 }
 
 export function EventTimeline({ eventos }: EventTimelineProps) {
@@ -52,11 +56,10 @@ export function EventTimeline({ eventos }: EventTimelineProps) {
                   <p className="text-xs text-muted-foreground">
                     {format(new Date(evento.criado_em), "dd/MM/yy HH:mm", { locale: ptBR })}
                   </p>
-                  {evento.ip_address && (
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {evento.ip_address}
-                    </p>
-                  )}
+                  {/* Item 8: nome do funcionário em vez de IP */}
+                  <p className="text-xs text-muted-foreground">
+                    {evento.users?.nome ?? 'Sistema'}
+                  </p>
                 </div>
               </div>
             </div>

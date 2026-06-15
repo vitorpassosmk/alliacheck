@@ -15,6 +15,7 @@ const VeiculoUpdateSchema = z.object({
   tem_placas_separadas: z.boolean().optional(),
   placa_carreta: z.string().nullable().optional(),
   cpf_proprietario: z.string().nullable().optional(),
+  cnpj_proprietario: z.string().nullable().optional(),
   banco_proprietario: z.string().nullable().optional(),
   agencia_conta_proprietario: z.string().nullable().optional(),
   chave_pix_proprietario: z.string().nullable().optional(),

@@ -134,6 +134,7 @@ export type Database = {
           tem_placas_separadas: boolean
           placa_carreta: string | null
           cpf_proprietario: string | null
+          cnpj_proprietario: string | null
           banco_proprietario: string | null
           agencia_conta_proprietario: string | null
           chave_pix_proprietario: string | null
@@ -151,6 +152,7 @@ export type Database = {
           tem_placas_separadas?: boolean
           placa_carreta?: string | null
           cpf_proprietario?: string | null
+          cnpj_proprietario?: string | null
           banco_proprietario?: string | null
           agencia_conta_proprietario?: string | null
           chave_pix_proprietario?: string | null
@@ -168,6 +170,7 @@ export type Database = {
           tem_placas_separadas?: boolean
           placa_carreta?: string | null
           cpf_proprietario?: string | null
+          cnpj_proprietario?: string | null
           banco_proprietario?: string | null
           agencia_conta_proprietario?: string | null
           chave_pix_proprietario?: string | null
@@ -202,6 +205,9 @@ export type Database = {
           criado_por: string | null
           criado_em: string
           atualizado_em: string
+          custo_agregado: number | null
+          adiantamento_pago_em: string | null
+          adiantamento_pago_por: string | null
           pago_em: string | null
           pago_por: string | null
           excluido_em: string | null
@@ -234,6 +240,9 @@ export type Database = {
           criado_por?: string | null
           criado_em?: string
           atualizado_em?: string
+          custo_agregado?: number | null
+          adiantamento_pago_em?: string | null
+          adiantamento_pago_por?: string | null
           pago_em?: string | null
           pago_por?: string | null
           excluido_em?: string | null
@@ -266,6 +275,9 @@ export type Database = {
           criado_por?: string | null
           criado_em?: string
           atualizado_em?: string
+          custo_agregado?: number | null
+          adiantamento_pago_em?: string | null
+          adiantamento_pago_por?: string | null
           pago_em?: string | null
           pago_por?: string | null
           excluido_em?: string | null
@@ -402,3 +414,8 @@ export type TablesInsert<T extends keyof Database['public']['Tables']> =
 
 export type TablesUpdate<T extends keyof Database['public']['Tables']> =
   Database['public']['Tables'][T]['Update']
+
+// Evento com JOIN de users (usado no EventTimeline para mostrar nome do funcionário)
+export type EventoComUsuario = Tables<'eventos'> & {
+  users: Pick<Tables<'users'>, 'nome' | 'papel'> | null
+}

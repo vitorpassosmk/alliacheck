@@ -16,6 +16,8 @@ import type { Tables } from '@/types/database.types'
 
 const UFs = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO']
 
+const TIPOS_VEICULO = ['VAN', 'TOCO', 'TRUCK', 'BITRUCK', 'CARRETA', 'CARRETA_LS', 'BITREM'] as const
+
 const FreteSchema = z.object({
   numero_frete: z.string().min(1, 'Obrigatório'),
   origem_cidade: z.string().min(1, 'Obrigatório'),
@@ -23,10 +25,12 @@ const FreteSchema = z.object({
   destino_cidade: z.string().min(1, 'Obrigatório'),
   destino_uf: z.string().length(2, 'UF inválida'),
   cliente_id: z.string().uuid().nullable().optional(),
+  tipo_veiculo: z.string().nullable().optional(),
   tipo_produto: z.string().nullable().optional(),
   valor_mercadoria: z.string().optional(),
   valor_frete: z.string().optional(),
-  data_carregamento: z.string().min(1, 'Obrigatório'),
+  custo_agregado: z.string().optional(),
+  data_carregamento: z.string().optional().nullable(),
   data_entrega_prevista: z.string().nullable().optional(),
   observacoes: z.string().nullable().optional(),
 })
@@ -37,9 +41,10 @@ interface FreteFormModalProps {
   open: boolean
   onClose: () => void
   freteId?: string
+  defaultValues?: Partial<FreteFormData>
 }
 
-export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) {
+export function FreteFormModal({ open, onClose, freteId, defaultValues }: FreteFormModalProps) {
   const queryClient = useQueryClient()
   const isEditing = !!freteId
 
@@ -65,9 +70,11 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
       destino_cidade: '',
       destino_uf: '',
       cliente_id: undefined,
+      tipo_veiculo: undefined,
       tipo_produto: undefined,
       valor_mercadoria: '',
       valor_frete: '',
+      custo_agregado: '',
       data_carregamento: '',
       data_entrega_prevista: undefined,
       observacoes: undefined,
@@ -77,8 +84,26 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
   useEffect(() => {
     if (!open) {
       form.reset()
+    } else if (defaultValues) {
+      form.reset({
+        numero_frete: '',
+        origem_cidade: '',
+        origem_uf: '',
+        destino_cidade: '',
+        destino_uf: '',
+        cliente_id: undefined,
+        tipo_veiculo: undefined,
+        tipo_produto: undefined,
+        valor_mercadoria: '',
+        valor_frete: '',
+        custo_agregado: '',
+        data_carregamento: '',
+        data_entrega_prevista: undefined,
+        observacoes: undefined,
+        ...defaultValues,
+      })
     }
-  }, [open, form])
+  }, [open, form, defaultValues])
 
   useEffect(() => {
     if (proximoNumero?.numero && !isEditing && !form.getValues('numero_frete')) {
@@ -90,10 +115,15 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
     mutationFn: async (data: FreteFormData) => {
       const url = isEditing ? `/api/fretes/${freteId}` : '/api/fretes'
       const method = isEditing ? 'PATCH' : 'POST'
+      const parsePositive = (v: string | undefined): number | null => {
+        const n = parseFloat(v ?? '')
+        return !isNaN(n) && n > 0 ? n : null
+      }
       const payload = {
         ...data,
-        valor_mercadoria: data.valor_mercadoria ? parseFloat(data.valor_mercadoria) : null,
-        valor_frete: data.valor_frete ? parseFloat(data.valor_frete) : null,
+        valor_mercadoria: parsePositive(data.valor_mercadoria),
+        valor_frete: parsePositive(data.valor_frete),
+        custo_agregado: parsePositive(data.custo_agregado),
       }
       const res = await fetch(url, {
         method,
@@ -198,6 +228,20 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
               </FormItem>
             )} />
 
+            {/* Tipo de Veículo */}
+            <FormField control={form.control} name="tipo_veiculo" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo de Veículo</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo de veículo" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {TIPOS_VEICULO.map(t => <SelectItem key={t} value={t}>{t.replace('_', ' ')}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             {/* Tipo de Produto */}
             <FormField control={form.control} name="tipo_produto" render={({ field }) => (
               <FormItem>
@@ -251,12 +295,31 @@ export function FreteFormModal({ open, onClose, freteId }: FreteFormModalProps) 
               )} />
             </div>
 
+            <FormField control={form.control} name="custo_agregado" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Custo do Agregado (R$)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="0,00 — valor total a pagar ao proprietário"
+                    {...field}
+                    value={field.value ?? ''}
+                    onChange={e => field.onChange(e.target.value)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             {/* Datas */}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="data_carregamento" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data Carregamento *</FormLabel>
+                  <FormLabel>Data Carregamento</FormLabel>
                   <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
+                  <p className="text-xs text-muted-foreground">Pode ser preenchida ao programar o frete</p>
                   <FormMessage />
                 </FormItem>
               )} />
