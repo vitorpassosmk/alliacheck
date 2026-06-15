@@ -8,8 +8,10 @@ import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ShieldAlert } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ShieldAlert, Search, Building2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MapPin, Calendar, CreditCard, CheckCircle2, Truck } from 'lucide-react'
 import type { FreteComRelacoes } from '@/services/fretes.service'
 
@@ -81,6 +83,8 @@ export default function PagamentosPage() {
   const supabase = createClient()
   const [papel, setPapel] = useState<string | null>(null)
   const [papelCarregado, setPapelCarregado] = useState(false)
+  const [busca, setBusca] = useState('')
+  const [bancoDetalhe, setBancoDetalhe] = useState<FreteComRelacoes | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -118,6 +122,19 @@ export default function PagamentosPage() {
     )
   }
 
+  const filtrarFrete = (frete: FreteComRelacoes) => {
+    if (!busca.trim()) return true
+    const q = busca.toLowerCase()
+    return (
+      (frete.numero_frete?.toLowerCase().includes(q) ?? false) ||
+      (frete.numero_contrato?.toLowerCase().includes(q) ?? false)
+    )
+  }
+
+  const adiantamentosFiltrados = adiantamentos.filter(filtrarFrete)
+  const finaisFiltrados = finaisPendentes.filter(filtrarFrete)
+  const pagosFiltrados = pagos.filter(filtrarFrete)
+
   if (papel === 'CONFERENTE') {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
@@ -133,6 +150,16 @@ export default function PagamentosPage() {
       <div>
         <h1 className="text-xl font-semibold">Pagamentos</h1>
         <p className="text-sm text-muted-foreground">Gerencie adiantamentos e pagamentos finais de fretes</p>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por Nº pedido ou Nº contrato..."
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Seção 1: Adiantamentos Pendentes */}
@@ -153,14 +180,14 @@ export default function PagamentosPage() {
           <div className="space-y-3">
             {[1, 2].map((i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
           </div>
-        ) : adiantamentos.length === 0 ? (
+        ) : adiantamentosFiltrados.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
             Nenhum adiantamento pendente
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {adiantamentos.map((frete) => (
-              <FreteCardAdiantamento key={frete.id} frete={frete} />
+            {adiantamentosFiltrados.map((frete) => (
+              <FreteCardAdiantamento key={frete.id} frete={frete} onCardClick={() => setBancoDetalhe(frete)} />
             ))}
           </div>
         )}
@@ -184,14 +211,14 @@ export default function PagamentosPage() {
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-44 rounded-lg" />)}
           </div>
-        ) : finaisPendentes.length === 0 ? (
+        ) : finaisFiltrados.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
             Nenhuma viagem aguardando pagamento final
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {finaisPendentes.map((frete) => (
-              <FreteCardPagamentoFinal key={frete.id} frete={frete} />
+            {finaisFiltrados.map((frete) => (
+              <FreteCardPagamentoFinal key={frete.id} frete={frete} onCardClick={() => setBancoDetalhe(frete)} />
             ))}
           </div>
         )}
@@ -205,19 +232,110 @@ export default function PagamentosPage() {
           <div className="space-y-3">
             {[1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
-        ) : pagos.length === 0 ? (
+        ) : pagosFiltrados.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl text-sm">
             Nenhum pagamento registrado ainda
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {pagos.map((frete) => (
+            {pagosFiltrados.map((frete) => (
               <FreteCardPago key={frete.id} frete={frete} />
             ))}
           </div>
         )}
       </section>
+
+      <ModalDadosBancarios
+        frete={bancoDetalhe}
+        open={!!bancoDetalhe}
+        onOpenChange={(v) => !v && setBancoDetalhe(null)}
+      />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Modal — dados bancários
+// ---------------------------------------------------------------------------
+
+function ModalDadosBancarios({
+  frete,
+  open,
+  onOpenChange,
+}: {
+  frete: FreteComRelacoes | null
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
+  if (!frete) return null
+  const m = frete.motoristas
+  const v = frete.veiculos
+  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
+
+  const banco = motoristaPropriétario
+    ? {
+        nome: m?.nome,
+        banco: (m as { banco?: string }).banco,
+        conta: (m as { agencia_conta?: string }).agencia_conta,
+        pix: (m as { chave_pix?: string }).chave_pix,
+        label: 'Motorista / Proprietário',
+      }
+    : {
+        nome: v?.proprietario ?? v?.placa,
+        banco: v?.banco_proprietario,
+        conta: v?.agencia_conta_proprietario,
+        pix: v?.chave_pix_proprietario,
+        label: 'Proprietário do Veículo',
+      }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Dados Bancários para Pagamento
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+            <p className="font-semibold">{frete.numero_frete}</p>
+            <p className="text-muted-foreground">
+              {frete.origem_cidade}/{frete.origem_uf} → {frete.destino_cidade}/{frete.destino_uf}
+            </p>
+            {m && <p className="text-muted-foreground">Motorista: {m.nome}</p>}
+            {v && <p className="text-muted-foreground">Veículo: {v.placa}</p>}
+          </div>
+
+          <div className="border rounded-lg p-4 space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{banco.label}</p>
+            {banco.nome && <p className="font-semibold text-lg">{banco.nome}</p>}
+            {banco.banco ? (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Banco</span>
+                  <span className="font-medium">{banco.banco}</span>
+                </div>
+                {banco.conta && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Agência / Conta</span>
+                    <span className="font-mono font-medium">{banco.conta}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Dados bancários não cadastrados</p>
+            )}
+            {banco.pix && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                <p className="text-xs text-green-700 font-medium mb-1">Chave PIX</p>
+                <p className="font-mono text-sm break-all">{banco.pix}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -225,7 +343,7 @@ export default function PagamentosPage() {
 // Card — adiantamento pendente (Item 11 — Seção 1)
 // ---------------------------------------------------------------------------
 
-function FreteCardAdiantamento({ frete }: { frete: FreteComRelacoes }) {
+function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes; onCardClick: () => void }) {
   const [dialogAberto, setDialogAberto] = useState(false)
   const [loading, setLoading] = useState(false)
   const queryClient = useQueryClient()
@@ -270,7 +388,7 @@ function FreteCardAdiantamento({ frete }: { frete: FreteComRelacoes }) {
 
   return (
     <>
-      <Card className="border border-amber-200 bg-amber-50">
+      <Card className="border border-amber-200 bg-amber-50 cursor-pointer" onClick={onCardClick}>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <span className="font-bold tracking-wide text-amber-900">
@@ -345,7 +463,7 @@ function FreteCardAdiantamento({ frete }: { frete: FreteComRelacoes }) {
             )
           )}
 
-          <div className="border-t pt-3">
+          <div className="border-t pt-3" onClick={(e) => e.stopPropagation()}>
             <Button
               className="w-full bg-amber-600 hover:bg-amber-700 text-white"
               size="sm"
@@ -374,7 +492,7 @@ function FreteCardAdiantamento({ frete }: { frete: FreteComRelacoes }) {
 // Card — pagamento final pendente (Item 11 — Seção 2)
 // ---------------------------------------------------------------------------
 
-function FreteCardPagamentoFinal({ frete }: { frete: FreteComRelacoes }) {
+function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelacoes; onCardClick: () => void }) {
   const [dialogAberto, setDialogAberto] = useState(false)
   const [loading, setLoading] = useState(false)
   const queryClient = useQueryClient()
@@ -429,7 +547,7 @@ function FreteCardPagamentoFinal({ frete }: { frete: FreteComRelacoes }) {
 
   return (
     <>
-      <Card className="border bg-white">
+      <Card className="border bg-white cursor-pointer" onClick={onCardClick}>
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <span className="font-bold tracking-wide text-[#3B6D11]">
@@ -520,7 +638,7 @@ function FreteCardPagamentoFinal({ frete }: { frete: FreteComRelacoes }) {
             </div>
           )}
 
-          <div className="border-t pt-3">
+          <div className="border-t pt-3" onClick={(e) => e.stopPropagation()}>
             <Button
               className="w-full bg-teal-600 hover:bg-teal-700 text-white"
               size="sm"
