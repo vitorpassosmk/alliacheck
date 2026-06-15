@@ -14,7 +14,8 @@ interface FreteCardProps {
 function DataLabel({ frete }: { frete: FreteComRelacoes }) {
   const status = frete.status as StatusViagem
 
-  if (status === 'CONCLUIDA' && frete.data_entrega_real) {
+  if (status === 'CONCLUIDA') {
+    if (!frete.data_entrega_real) return null
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Calendar className="h-3 w-3 shrink-0" />
