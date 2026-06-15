@@ -11,10 +11,19 @@ interface FreteCardProps {
   onClick: (frete: FreteComRelacoes) => void
 }
 
-// Item 10: após EM_VIAGEM mostrar data de entrega prevista
 function DataLabel({ frete }: { frete: FreteComRelacoes }) {
   const status = frete.status as StatusViagem
-  const mostrarEntrega = ['EM_VIAGEM', 'CONCLUIDA'].includes(status)
+
+  if (status === 'CONCLUIDA' && frete.data_entrega_real) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Calendar className="h-3 w-3 shrink-0" />
+        <span>Descarga: {new Date(frete.data_entrega_real + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+      </div>
+    )
+  }
+
+  const mostrarEntrega = status === 'EM_VIAGEM'
   const data = mostrarEntrega ? frete.data_entrega_prevista : frete.data_carregamento
   const label = mostrarEntrega ? 'Prev. entrega:' : 'Carregamento:'
 
