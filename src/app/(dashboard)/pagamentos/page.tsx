@@ -270,14 +270,14 @@ function ModalDadosBancarios({
   if (!frete) return null
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
+  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
 
   const banco = motoristaPropriétario
     ? {
         nome: m?.nome,
-        banco: (m as { banco?: string }).banco,
-        conta: (m as { agencia_conta?: string }).agencia_conta,
-        pix: (m as { chave_pix?: string }).chave_pix,
+        banco: m?.banco,
+        conta: m?.agencia_conta,
+        pix: m?.chave_pix,
         label: 'Motorista / Proprietário',
       }
     : {
@@ -544,6 +544,7 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
 
   const m = frete.motoristas
   const v = frete.veiculos
+  const motoristaPropriétario = !!(m && v && (m as { cpf?: string }).cpf && v.cpf_proprietario && (m as { cpf?: string }).cpf === v.cpf_proprietario)
 
   return (
     <>
@@ -608,34 +609,35 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
             )}
           </div>
 
-          {/* Dados bancários do proprietário do veículo */}
-          {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
-            <div className="border-t pt-2 space-y-1">
-              <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
-              </p>
-              {v.banco_proprietario && (
-                <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
-              )}
-              {v.chave_pix_proprietario && (
-                <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
-              )}
-            </div>
-          )}
-
-          {/* Dados bancários do motorista (fallback) */}
-          {m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) && (
-            <div className="border-t pt-2 space-y-1">
-              <p className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                <CreditCard className="h-3 w-3" /> Banco — {m.nome}
-              </p>
-              {(m as { banco?: string }).banco && (
-                <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
-              )}
-              {(m as { chave_pix?: string }).chave_pix && (
-                <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
-              )}
-            </div>
+          {/* Dados bancários — lógica exclusiva: motorista/proprietário OU proprietário */}
+          {motoristaPropriétario ? (
+            m && ((m as { banco?: string }).banco || (m as { chave_pix?: string }).chave_pix) ? (
+              <div className="border-t pt-2 space-y-1">
+                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                  <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
+                </p>
+                {(m as { banco?: string }).banco && (
+                  <p className="text-xs">{(m as { banco?: string }).banco} · {(m as { agencia_conta?: string }).agencia_conta}</p>
+                )}
+                {(m as { chave_pix?: string }).chave_pix && (
+                  <p className="text-xs text-muted-foreground">PIX: {(m as { chave_pix?: string }).chave_pix}</p>
+                )}
+              </div>
+            ) : null
+          ) : (
+            v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
+              <div className="border-t pt-2 space-y-1">
+                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                  <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
+                </p>
+                {v.banco_proprietario && (
+                  <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
+                )}
+                {v.chave_pix_proprietario && (
+                  <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
+                )}
+              </div>
+            ) : null
           )}
 
           <div className="border-t pt-3" onClick={(e) => e.stopPropagation()}>
