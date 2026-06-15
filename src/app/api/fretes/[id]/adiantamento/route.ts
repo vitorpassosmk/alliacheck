@@ -20,7 +20,7 @@ export async function POST(
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, adiantamento_pago_em, numero_frete')
+    .select('status, adiantamento_pago_em, numero_frete, checklist_liberacao_ok')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -28,6 +28,9 @@ export async function POST(
   if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
   if (frete.status !== 'AGUARDANDO_LIBERACAO') {
     return Response.json({ error: 'O adiantamento só pode ser confirmado em fretes AGUARDANDO LIBERAÇÃO' }, { status: 422 })
+  }
+  if (!frete.checklist_liberacao_ok) {
+    return Response.json({ error: 'O checklist de conferência deve ser concluído antes de confirmar o adiantamento' }, { status: 422 })
   }
   if (frete.adiantamento_pago_em) {
     return Response.json({ error: 'Adiantamento já foi confirmado' }, { status: 409 })

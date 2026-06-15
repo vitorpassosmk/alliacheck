@@ -14,7 +14,7 @@ import { FreteFormModal } from '@/components/fretes/FreteFormModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { Tables, EventoComUsuario } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
@@ -85,9 +85,6 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [senhaEditAberta, setSenhaEditAberta] = useState(false)
   const [loadingEditSenha, setLoadingEditSenha] = useState(false)
   const [editAberto, setEditAberto] = useState(false)
-
-  // Checklist de conferência — AGUARDANDO_LIBERACAO
-  const [todoConferido, setTodoConferido] = useState(false)
 
   const { data: frete, isLoading, isError } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -361,7 +358,6 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setNumeroCiot={setNumeroCiot}
                     valorAdiantamento={valorAdiantamento}
                     setValorAdiantamento={setValorAdiantamento}
-                    liberacaoConferida={todoConferido}
                     dataDescarga={dataDescarga}
                     setDataDescarga={setDataDescarga}
                   />
@@ -388,9 +384,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 />
               )}
 
-              {/* Item 6: Painel de conferência — AGUARDANDO_LIBERACAO */}
               {frete.status === 'AGUARDANDO_LIBERACAO' && (
-                <LiberacaoPanel frete={frete} onConferido={setTodoConferido} />
+                <LiberacaoPanel freteId={freteId} frete={frete} papel={papel ?? null} />
               )}
 
               {/* Informações do frete */}
@@ -590,7 +585,6 @@ interface TransitionFormProps {
   setNumeroCiot: (v: string) => void
   valorAdiantamento: string
   setValorAdiantamento: (v: string) => void
-  liberacaoConferida?: boolean
   dataDescarga: string
   setDataDescarga: (v: string) => void
 }
@@ -608,7 +602,6 @@ function TransitionForm({
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
-  liberacaoConferida,
   dataDescarga, setDataDescarga,
 }: TransitionFormProps) {
   if (!nextStatus) return null
@@ -851,16 +844,9 @@ function TransitionForm({
 
   if (status === 'AGUARDANDO_LIBERACAO') {
     return (
-      <Button
-        size="sm"
-        className="bg-green-600 hover:bg-green-700 text-white"
-        onClick={() => onAvancar('EM_VIAGEM')}
-        disabled={isPending || !liberacaoConferida}
-      >
-        {liberacaoConferida
-          ? 'Pagamento Realizado — Liberar para Viagem'
-          : 'Confirme todos os itens abaixo para liberar'}
-      </Button>
+      <p className="text-sm text-muted-foreground">
+        Realize o checklist abaixo. Após concluído, acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.
+      </p>
     )
   }
 
@@ -893,72 +879,104 @@ function TransitionForm({
 
 // ─── Painel de Liberação ─────────────────────────────────────────────────────
 
-function LiberacaoPanel({ frete, onConferido }: { frete: FreteCompleto; onConferido?: (v: boolean) => void }) {
-  const [grConferido, setGrConferido] = useState(false)
-  const [cteConferido, setCteConferido] = useState(false)
-  const [contratoConferido, setContratoConferido] = useState(false)
-  const [ciotConferido, setCiotConferido] = useState(false)
-  const [bancarioConferido, setBancarioConferido] = useState(false)
+function LiberacaoPanel({
+  freteId,
+  frete,
+  papel,
+}: {
+  freteId: string
+  frete: FreteCompleto
+  papel: string | null
+}) {
+  const queryClient = useQueryClient()
+
+  const { data: checklistData, isLoading: loadingChecklist } = useQuery({
+    queryKey: ['checklist', freteId],
+    queryFn: async () => {
+      const r = await fetch(`/api/fretes/${freteId}/checklist`)
+      if (!r.ok) return { itens: [], respostas: [] }
+      return r.json() as Promise<{
+        itens: { id: string; descricao: string; ordem: number }[]
+        respostas: { item_id: string; marcado_em: string }[]
+      }>
+    },
+  })
+
+  const itens = checklistData?.itens ?? []
+  const respostas = checklistData?.respostas ?? []
+  const marcadosIds = new Set(respostas.map(r => r.item_id))
+  const totalMarcados = marcadosIds.size
+  const totalItens = itens.length
+  const todosMarcados = totalItens > 0 && totalMarcados >= totalItens
+
+  const podeMarcar = ['ADMIN', 'SUPERVISOR', 'CONFERENTE'].includes(papel ?? '')
+
+  async function toggleItem(item_id: string, marcado: boolean) {
+    await fetch(`/api/fretes/${freteId}/checklist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id, marcado }),
+    })
+    queryClient.invalidateQueries({ queryKey: ['checklist', freteId] })
+    queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
+    queryClient.invalidateQueries({ queryKey: ['pagamentos'] })
+  }
 
   const m = frete.motoristas
   const v = frete.veiculos
   const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
 
-  const checklistItems = [
-    { label: 'N° GR (seguro)', value: frete.numero_gr, checked: grConferido, onChange: setGrConferido, id: 'gr' },
-    { label: 'N° CT-e', value: frete.chave_cte ? `...${frete.chave_cte.slice(-8)}` : null, checked: cteConferido, onChange: setCteConferido, id: 'cte' },
-    { label: 'N° Contrato', value: frete.numero_contrato, checked: contratoConferido, onChange: setContratoConferido, id: 'contrato' },
-    { label: 'CIOT', value: frete.numero_ciot, checked: ciotConferido, onChange: setCiotConferido, id: 'ciot' },
-  ]
-
-  const todosConferidos = grConferido && cteConferido && contratoConferido && ciotConferido && bancarioConferido
-
-  // Notifica o pai quando o estado de conferência muda para habilitar o botão "Liberar"
-  useEffect(() => {
-    onConferido?.(todosConferidos)
-  }, [todosConferidos]) // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4">
-      <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-800">
-        <FileText className="h-4 w-4" />
-        Conferência de Liberação
-        {todosConferidos && <span className="text-green-700 text-xs font-normal">✓ Todos itens conferidos</span>}
-      </h3>
-
-      {/* Checkboxes interativos */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Marque cada item após conferência</p>
-        {checklistItems.map((item) => (
-          <div key={item.id} className="flex items-start gap-2 text-sm">
-            <Checkbox
-              id={`check-${item.id}`}
-              checked={item.checked}
-              onCheckedChange={(v) => item.onChange(v === true)}
-              className="mt-0.5"
-              disabled={!item.value}
-            />
-            <label htmlFor={`check-${item.id}`} className="font-medium min-w-[110px] cursor-pointer select-none">
-              {item.label}:
-            </label>
-            <span className="font-mono text-xs text-muted-foreground break-all">
-              {item.value ?? <span className="text-red-500 italic">não registrado</span>}
-            </span>
-          </div>
-        ))}
-
-        <div className="flex items-start gap-2 pt-1">
-          <Checkbox
-            id="bancario-conferido"
-            checked={bancarioConferido}
-            onCheckedChange={(v) => setBancarioConferido(v === true)}
-            className="mt-0.5"
-          />
-          <label htmlFor="bancario-conferido" className="text-sm font-medium cursor-pointer select-none">
-            Dados bancários do proprietário conferidos
-          </label>
-        </div>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold flex items-center gap-2 text-amber-800">
+          <FileText className="h-4 w-4" />
+          Conferência de Liberação
+        </h3>
+        {!loadingChecklist && totalItens > 0 && (
+          <span className="text-xs text-muted-foreground">{totalMarcados}/{totalItens} itens</span>
+        )}
       </div>
+
+      {loadingChecklist ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => <Skeleton key={i} className="h-5 w-full" />)}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Marque cada item após conferência
+          </p>
+          {itens.map(item => {
+            const checked = marcadosIds.has(item.id)
+            return (
+              <div key={item.id} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  id={`check-${item.id}`}
+                  checked={checked}
+                  onCheckedChange={val => podeMarcar && toggleItem(item.id, val === true)}
+                  disabled={!podeMarcar}
+                />
+                <label
+                  htmlFor={`check-${item.id}`}
+                  className={`cursor-pointer select-none ${checked ? 'line-through text-muted-foreground' : ''}`}
+                >
+                  {item.descricao}
+                </label>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {todosMarcados && (
+        <div className="border border-green-200 bg-green-50 rounded-md p-3 text-sm text-green-800 flex items-start gap-2">
+          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Checklist concluído. Acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.
+          </span>
+        </div>
+      )}
 
       <div className="border-t border-amber-200 pt-3 grid grid-cols-2 gap-4 text-sm">
         {m && (
@@ -991,7 +1009,7 @@ function LiberacaoPanel({ frete, onConferido }: { frete: FreteCompleto; onConfer
         </div>
 
         {motoristaPropriétario ? (
-          (m && (m.banco || m.agencia_conta || m.chave_pix)) ? (
+          m && (m.banco || m.agencia_conta || m.chave_pix) ? (
             <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
               <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
                 <CreditCard className="h-3 w-3" /> Dados para Pagamento — Motorista / Proprietário

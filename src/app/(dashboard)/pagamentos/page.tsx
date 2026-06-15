@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
-import { ShieldAlert, Search, Building2 } from 'lucide-react'
+import { ShieldAlert, Search, Building2, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MapPin, Calendar, CreditCard, CheckCircle2, Truck } from 'lucide-react'
@@ -463,15 +463,28 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
             )
           )}
 
-          <div className="border-t pt-3" onClick={(e) => e.stopPropagation()}>
-            <Button
-              className="w-full bg-amber-600 hover:bg-amber-700 text-white"
-              size="sm"
-              onClick={() => setDialogAberto(true)}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-1.5" />
-              Confirmar Adiantamento e Liberar Viagem
-            </Button>
+          <div className="border-t pt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+            {!frete.checklist_liberacao_ok ? (
+              <>
+                <p className="text-xs text-amber-700 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  Checklist de conferência pendente
+                </p>
+                <Button className="w-full" size="sm" disabled variant="outline">
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                  Aguardando Checklist
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                size="sm"
+                onClick={() => setDialogAberto(true)}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                Confirmar Adiantamento e Liberar Viagem
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -9,6 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      checklist_itens: {
+        Row: {
+          id: string
+          descricao: string
+          ordem: number
+          ativo: boolean
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          descricao: string
+          ordem?: number
+          ativo?: boolean
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          descricao?: string
+          ordem?: number
+          ativo?: boolean
+          criado_em?: string
+        }
+        Relationships: []
+      }
+      checklist_respostas: {
+        Row: {
+          id: string
+          frete_id: string
+          item_id: string
+          marcado_em: string
+          marcado_por: string
+        }
+        Insert: {
+          id?: string
+          frete_id: string
+          item_id: string
+          marcado_em?: string
+          marcado_por: string
+        }
+        Update: {
+          id?: string
+          frete_id?: string
+          item_id?: string
+          marcado_em?: string
+          marcado_por?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           id: string
@@ -216,6 +264,7 @@ export type Database = {
           excluido_em: string | null
           excluido_por: string | null
           placa_carreta: string | null
+          checklist_liberacao_ok: boolean
         }
         Insert: {
           id?: string
@@ -252,6 +301,7 @@ export type Database = {
           excluido_em?: string | null
           excluido_por?: string | null
           placa_carreta?: string | null
+          checklist_liberacao_ok?: boolean
         }
         Update: {
           id?: string
@@ -288,6 +338,7 @@ export type Database = {
           excluido_em?: string | null
           excluido_por?: string | null
           placa_carreta?: string | null
+          checklist_liberacao_ok?: boolean
         }
         Relationships: [
           {
