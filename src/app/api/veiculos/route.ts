@@ -17,6 +17,8 @@ const VeiculoSchema = z.object({
   banco_proprietario: z.string().nullable().optional(),
   agencia_conta_proprietario: z.string().nullable().optional(),
   chave_pix_proprietario: z.string().nullable().optional(),
+  rntrc: z.string().nullable().optional(),
+  tag: z.string().nullable().optional(),
 })
 
 export async function GET() {

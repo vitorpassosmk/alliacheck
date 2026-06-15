@@ -129,6 +129,7 @@ export type Database = {
           ano: number | null
           proprietario: string | null
           rntrc: string | null
+          tag: string | null
           ativo: boolean
           tipo_veiculo: 'FROTA' | 'AGREGADO' | null
           tem_placas_separadas: boolean
@@ -147,6 +148,7 @@ export type Database = {
           ano?: number | null
           proprietario?: string | null
           rntrc?: string | null
+          tag?: string | null
           ativo?: boolean
           tipo_veiculo?: 'FROTA' | 'AGREGADO' | null
           tem_placas_separadas?: boolean
@@ -165,6 +167,7 @@ export type Database = {
           ano?: number | null
           proprietario?: string | null
           rntrc?: string | null
+          tag?: string | null
           ativo?: boolean
           tipo_veiculo?: 'FROTA' | 'AGREGADO' | null
           tem_placas_separadas?: boolean

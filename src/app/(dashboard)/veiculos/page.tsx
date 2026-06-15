@@ -46,6 +46,8 @@ const VeiculoSchema = z.object({
   banco_proprietario: z.string().optional(),
   agencia_conta_proprietario: z.string().optional(),
   chave_pix_proprietario: z.string().optional(),
+  rntrc: z.string().optional(),
+  tag: z.string().optional(),
 })
 
 type VeiculoForm = z.infer<typeof VeiculoSchema>
@@ -78,6 +80,8 @@ export default function VeiculosPage() {
       tipo_veiculo: null, tem_placas_separadas: false, placa_carreta: '',
       cpf_proprietario: '', cnpj_proprietario: '',
       banco_proprietario: '', agencia_conta_proprietario: '', chave_pix_proprietario: '',
+      rntrc: '',
+      tag: '',
     },
   })
 
@@ -127,6 +131,8 @@ export default function VeiculosPage() {
       banco_proprietario: v.banco_proprietario ?? '',
       agencia_conta_proprietario: v.agencia_conta_proprietario ?? '',
       chave_pix_proprietario: v.chave_pix_proprietario ?? '',
+      rntrc: v.rntrc ?? '',
+      tag: (v as typeof v & { tag?: string | null }).tag ?? '',
     })
     setModalOpen(true)
   }
@@ -165,6 +171,10 @@ export default function VeiculosPage() {
                   {v.modelo && <span>{v.modelo}</span>}
                   {v.ano && <><span>·</span><span>{v.ano}</span></>}
                   {v.proprietario && <><span>·</span><span>{v.proprietario}</span></>}
+                  {v.rntrc && <><span>·</span><span>RNTRC: {v.rntrc}</span></>}
+                  {(v as typeof v & { tag?: string | null }).tag && (
+                    <><span>·</span><span>TAG: {(v as typeof v & { tag?: string | null }).tag}</span></>
+                  )}
                 </div>
               </div>
               {podeGerenciar && (
@@ -349,6 +359,31 @@ export default function VeiculosPage() {
                 <FormField control={form.control} name="chave_pix_proprietario" render={({ field }) => (
                   <FormItem><FormLabel>Chave PIX</FormLabel><FormControl><Input placeholder="CPF, e-mail, telefone ou chave aleatória" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+              </div>
+
+              {/* RNTRC e TAG do veículo */}
+              <div className="space-y-3 pt-2 border-t">
+                <p className="text-sm font-medium text-muted-foreground">Identificadores do Veículo</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="rntrc" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>RNTRC</FormLabel>
+                      <FormControl>
+                        <Input placeholder="N° RNTRC" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="tag" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TAG</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ID da TAG" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
