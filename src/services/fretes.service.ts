@@ -2,8 +2,8 @@ import type { Tables } from '@/types/database.types'
 
 export type FreteComRelacoes = Tables<'fretes'> & {
   clientes: Pick<Tables<'clientes'>, 'razao_social'> | null
-  motoristas: Pick<Tables<'motoristas'>, 'nome' | 'cnh' | 'validade_cnh' | 'banco' | 'agencia_conta' | 'chave_pix'> | null
-  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo' | 'banco_proprietario' | 'agencia_conta_proprietario' | 'chave_pix_proprietario'> | null
+  motoristas: Pick<Tables<'motoristas'>, 'nome' | 'cnh' | 'validade_cnh' | 'banco' | 'agencia_conta' | 'chave_pix' | 'cpf'> | null
+  veiculos: Pick<Tables<'veiculos'>, 'placa' | 'tipo' | 'proprietario' | 'cpf_proprietario' | 'banco_proprietario' | 'agencia_conta_proprietario' | 'chave_pix_proprietario'> | null
 }
 
 export type FreteCreatePayload = {
