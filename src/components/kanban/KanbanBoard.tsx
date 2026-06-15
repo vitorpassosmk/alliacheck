@@ -18,9 +18,10 @@ async function fetchFretes(supabase: ReturnType<typeof createClient>) {
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix),
-      veiculos(placa, tipo, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix, cpf),
+      veiculos(placa, tipo, placa_carreta, proprietario, cpf_proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
+    .is('excluido_em', null)
     .neq('status', 'CANCELADO')
     .or('status.neq.CONCLUIDA,pago_em.is.null')
     .order('criado_em', { ascending: false })

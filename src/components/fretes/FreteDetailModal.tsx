@@ -82,10 +82,16 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   // Checklist de conferência — AGUARDANDO_LIBERACAO
   const [todoConferido, setTodoConferido] = useState(false)
 
-  const { data: frete, isLoading } = useQuery<FreteCompleto>({
+  const { data: frete, isLoading, isError } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
-    queryFn: () => fetch(`/api/fretes/${freteId}`).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/fretes/${freteId}`)
+      const json = await r.json()
+      if (!r.ok) throw new Error(json.error ?? 'Frete não encontrado')
+      return json as FreteCompleto
+    },
     enabled: open,
+    retry: false,
   })
 
   const { data: papel } = useQuery<string | null>({
@@ -253,6 +259,12 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
               <Skeleton className="h-8 w-48" />
               <Skeleton className="h-24 rounded-lg" />
               <Skeleton className="h-48 rounded-lg" />
+            </div>
+          ) : isError ? (
+            <div className="p-6 space-y-4 text-center">
+              <DialogTitle className="sr-only">Erro</DialogTitle>
+              <p className="text-muted-foreground">Frete não encontrado ou foi excluído.</p>
+              <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
             </div>
           ) : (
             <>
