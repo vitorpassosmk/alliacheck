@@ -212,6 +212,7 @@ export type Database = {
           pago_por: string | null
           excluido_em: string | null
           excluido_por: string | null
+          placa_carreta: string | null
         }
         Insert: {
           id?: string
@@ -247,6 +248,7 @@ export type Database = {
           pago_por?: string | null
           excluido_em?: string | null
           excluido_por?: string | null
+          placa_carreta?: string | null
         }
         Update: {
           id?: string
@@ -282,6 +284,7 @@ export type Database = {
           pago_por?: string | null
           excluido_em?: string | null
           excluido_por?: string | null
+          placa_carreta?: string | null
         }
         Relationships: [
           {
@@ -394,6 +397,13 @@ export type Database = {
             columns: ['frete_id']
             isOneToOne: false
             referencedRelation: 'fretes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'eventos_usuario_id_fkey_public'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'users'
             referencedColumns: ['id']
           }
         ]

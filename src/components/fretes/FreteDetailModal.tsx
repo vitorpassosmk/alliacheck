@@ -56,6 +56,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [motoristaId, setMotoristaId] = useState('')
   const [veiculoId, setVeiculoId] = useState('')
   const [custoAgregado, setCustoAgregado] = useState('')
+  const [valorAdiantamentoProgramado, setValorAdiantamentoProgramado] = useState('')
+  const [temPlacasSeparadas, setTemPlacasSeparadas] = useState(false)
+  const [placaCarreta, setPlacaCarreta] = useState('')
   const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
 
   // Formulário PROGRAMADO → CARREGANDO
@@ -117,6 +120,13 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     enabled: open && frete?.status === 'ABERTO',
   })
 
+  // Pré-preenche adiantamento no step AGUARDANDO_LIBERACAO se já foi definido no PROGRAMADO
+  useEffect(() => {
+    if (frete?.valor_adiantamento && !valorAdiantamento) {
+      setValorAdiantamento(frete.valor_adiantamento.toString())
+    }
+  }, [frete?.valor_adiantamento]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const avancarStatus = useMutation({
     mutationFn: async (novoStatus: StatusViagem) => {
       const body: Record<string, unknown> = { status: novoStatus }
@@ -130,6 +140,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         body.motorista_id = motoristaId
         body.veiculo_id = veiculoId
         if (custoAgregado) body.custo_agregado = parsePositive(custoAgregado)
+        if (valorAdiantamentoProgramado) body.valor_adiantamento = parsePositive(valorAdiantamentoProgramado)
+        body.placa_carreta = temPlacasSeparadas ? placaCarreta.trim() || null : null
         if (!frete?.data_carregamento && dataCarregamentoForm) {
           body.data_carregamento = dataCarregamentoForm
         }
@@ -157,6 +169,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setMotoristaId(''); setVeiculoId(''); setNumeroContrato('')
       setNumeroCiot(''); setValorAdiantamento('')
       setCustoAgregado(''); setDataCarregamentoForm('')
+      setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta('')
       toast.success('Status atualizado')
     },
     onError: (e: Error) => {
@@ -253,14 +266,14 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          {isLoading || !frete ? (
+          {isLoading ? (
             <div className="space-y-4 p-2">
               <DialogTitle className="sr-only">Carregando frete...</DialogTitle>
               <Skeleton className="h-8 w-48" />
               <Skeleton className="h-24 rounded-lg" />
               <Skeleton className="h-48 rounded-lg" />
             </div>
-          ) : isError ? (
+          ) : isError || !frete ? (
             <div className="p-6 space-y-4 text-center">
               <DialogTitle className="sr-only">Erro</DialogTitle>
               <p className="text-muted-foreground">Frete não encontrado ou foi excluído.</p>
@@ -311,6 +324,12 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setVeiculoId={setVeiculoId}
                     custoAgregado={custoAgregado}
                     setCustoAgregado={setCustoAgregado}
+                    valorAdiantamentoProgramado={valorAdiantamentoProgramado}
+                    setValorAdiantamentoProgramado={setValorAdiantamentoProgramado}
+                    temPlacasSeparadas={temPlacasSeparadas}
+                    setTemPlacasSeparadas={setTemPlacasSeparadas}
+                    placaCarreta={placaCarreta}
+                    setPlacaCarreta={setPlacaCarreta}
                     dataCarregamentoExistente={frete.data_carregamento}
                     dataCarregamentoForm={dataCarregamentoForm}
                     setDataCarregamentoForm={setDataCarregamentoForm}
@@ -387,14 +406,27 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                   {frete.veiculos && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Truck className="h-4 w-4 shrink-0" />
-                      <span>{frete.veiculos.placa} — {frete.veiculos.tipo}</span>
+                      <span>
+                        {frete.veiculos.placa}
+                        {frete.placa_carreta && ` + ${frete.placa_carreta}`}
+                        {' — '}{frete.veiculos.tipo}
+                      </span>
                     </div>
                   )}
-                  {frete.data_carregamento && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4 shrink-0" />
-                      <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
-                    </div>
+                  {(['EM_VIAGEM', 'CONCLUIDA'] as StatusViagem[]).includes(frete.status as StatusViagem) ? (
+                    frete.data_entrega_prevista && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        <span>Prev. Entrega: {new Date(frete.data_entrega_prevista + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    )
+                  ) : (
+                    frete.data_carregamento && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        <span>Carregamento: {new Date(frete.data_carregamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    )
                   )}
                   {frete.valor_frete && (
                     <div className="text-muted-foreground">
@@ -516,6 +548,12 @@ interface TransitionFormProps {
   setVeiculoId: (v: string) => void
   custoAgregado: string
   setCustoAgregado: (v: string) => void
+  valorAdiantamentoProgramado: string
+  setValorAdiantamentoProgramado: (v: string) => void
+  temPlacasSeparadas: boolean
+  setTemPlacasSeparadas: (v: boolean) => void
+  placaCarreta: string
+  setPlacaCarreta: (v: string) => void
   dataCarregamentoExistente: string | null
   dataCarregamentoForm: string
   setDataCarregamentoForm: (v: string) => void
@@ -538,6 +576,8 @@ function TransitionForm({
   motoristas, veiculos, usarDisponiveis,
   motoristaId, setMotoristaId, veiculoId, setVeiculoId,
   custoAgregado, setCustoAgregado,
+  valorAdiantamentoProgramado, setValorAdiantamentoProgramado,
+  temPlacasSeparadas, setTemPlacasSeparadas, placaCarreta, setPlacaCarreta,
   dataCarregamentoExistente, dataCarregamentoForm, setDataCarregamentoForm,
   numeroGr, setNumeroGr,
   chaveCte, setChaveCte, chaveCteError,
@@ -547,9 +587,23 @@ function TransitionForm({
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
-  // Item 1+13: ABERTO → PROGRAMADO — custo_agregado + data_carregamento condicional
+  // ABERTO → PROGRAMADO
   if (status === 'ABERTO') {
+    const veiculoSelecionado = veiculos.find(v => v.id === veiculoId) ?? null
     const podeProgramar = !!motoristaId && !!veiculoId && (!!dataCarregamentoExistente || !!dataCarregamentoForm)
+
+    function handleVeiculoChange(id: string) {
+      setVeiculoId(id)
+      const v = veiculos.find(vv => vv.id === id)
+      if (v?.tem_placas_separadas) {
+        setTemPlacasSeparadas(true)
+        setPlacaCarreta(v.placa_carreta ?? '')
+      } else {
+        setTemPlacasSeparadas(false)
+        setPlacaCarreta('')
+      }
+    }
+
     return (
       <div className="space-y-3">
         <p className="text-sm font-medium">Selecione motorista e veículo para programar o frete</p>
@@ -571,7 +625,7 @@ function TransitionForm({
             <label className="text-xs text-muted-foreground">
               Veículo *{usarDisponiveis && <span className="ml-1 text-muted-foreground/70">(disponíveis)</span>}
             </label>
-            <Select onValueChange={setVeiculoId} value={veiculoId}>
+            <Select onValueChange={handleVeiculoChange} value={veiculoId}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {veiculos.map(v =>
@@ -581,7 +635,39 @@ function TransitionForm({
             </Select>
           </div>
 
-          {/* Item 2: Data de carregamento — somente se não definida na criação */}
+          {/* Cavalo e carreta com placas separadas */}
+          {veiculoId && (
+            <div className="col-span-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="tem-placas-separadas"
+                  checked={temPlacasSeparadas}
+                  onCheckedChange={(v) => {
+                    setTemPlacasSeparadas(v === true)
+                    if (!v) setPlacaCarreta('')
+                    else if (veiculoSelecionado?.placa_carreta) setPlacaCarreta(veiculoSelecionado.placa_carreta)
+                  }}
+                />
+                <label htmlFor="tem-placas-separadas" className="text-xs text-muted-foreground cursor-pointer select-none">
+                  Cavalo e carreta com placas diferentes
+                </label>
+              </div>
+              {temPlacasSeparadas && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Placa da Carreta</label>
+                  <Input
+                    value={placaCarreta}
+                    onChange={e => setPlacaCarreta(e.target.value.toUpperCase())}
+                    placeholder="Ex: ABC1D23"
+                    className="max-w-xs uppercase"
+                    maxLength={8}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Data de carregamento — somente se não definida na criação */}
           {!dataCarregamentoExistente && (
             <div className="space-y-1 col-span-2">
               <label className="text-xs text-muted-foreground">Data de Carregamento *</label>
@@ -594,7 +680,7 @@ function TransitionForm({
             </div>
           )}
 
-          {/* Item 1+13: Custo do Agregado */}
+          {/* Custo do Agregado */}
           <div className="space-y-1 col-span-2">
             <label className="text-xs text-muted-foreground">
               Custo do Agregado (R$) — valor total a pagar ao proprietário
@@ -605,6 +691,22 @@ function TransitionForm({
               min="0.01"
               value={custoAgregado}
               onChange={e => setCustoAgregado(e.target.value)}
+              placeholder="0,00"
+              className="max-w-xs"
+            />
+          </div>
+
+          {/* Valor de Adiantamento */}
+          <div className="space-y-1 col-span-2">
+            <label className="text-xs text-muted-foreground">
+              Valor de Adiantamento (R$)
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={valorAdiantamentoProgramado}
+              onChange={e => setValorAdiantamentoProgramado(e.target.value)}
               placeholder="0,00"
               className="max-w-xs"
             />

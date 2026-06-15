@@ -32,7 +32,7 @@ export async function PATCH(
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, numero_frete, data_carregamento')
+    .select('status, numero_frete, data_carregamento, valor_adiantamento')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -79,6 +79,23 @@ export async function PATCH(
       }
       camposAdicionais.custo_agregado = custo_agregado
     }
+
+    // valor_adiantamento: pode ser registrado já na programação
+    const valor_adiantamento_prog = body.valor_adiantamento as number | undefined
+    if (valor_adiantamento_prog !== undefined) {
+      if (valor_adiantamento_prog <= 0) {
+        return Response.json({ error: 'Valor de adiantamento deve ser maior que zero' }, { status: 422 })
+      }
+      camposAdicionais.valor_adiantamento = valor_adiantamento_prog
+    }
+
+    // placa_carreta: placa da carreta para combinações cavalo+carreta
+    const placa_carreta = body.placa_carreta as string | null | undefined
+    if (placa_carreta !== undefined) {
+      camposAdicionais.placa_carreta = placa_carreta
+        ? placa_carreta.trim().toUpperCase().slice(0, 8)
+        : null
+    }
   }
 
   if (novoStatus === 'CARREGANDO') {
@@ -110,12 +127,14 @@ export async function PATCH(
     if (!numero_ciot) {
       return Response.json({ error: 'N° CIOT é obrigatório' }, { status: 422 })
     }
-    if (!valor_adiantamento || valor_adiantamento <= 0) {
+    // valor_adiantamento obrigatório, mas aceita o valor já registrado no frete
+    const adiantamentoFinal = valor_adiantamento ?? frete.valor_adiantamento
+    if (!adiantamentoFinal || adiantamentoFinal <= 0) {
       return Response.json({ error: 'Valor de adiantamento é obrigatório e deve ser maior que zero' }, { status: 422 })
     }
     camposAdicionais.numero_contrato = numero_contrato
     camposAdicionais.numero_ciot = numero_ciot
-    camposAdicionais.valor_adiantamento = valor_adiantamento
+    camposAdicionais.valor_adiantamento = adiantamentoFinal
   }
 
   const motivoSanitizado = novoStatus === 'CANCELADO'

@@ -7,7 +7,8 @@ import { FreteDetailModal } from '@/components/fretes/FreteDetailModal'
 import { FreteFormModal } from '@/components/fretes/FreteFormModal'
 import { KpiBar, type KpiBarData } from '@/components/dashboard/KpiBar'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Plus, Search } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FreteComRelacoes } from '@/services/fretes.service'
 
@@ -31,14 +32,18 @@ function filtrarPorPeriodo(
   if (!inicio && !fim) return fretes
 
   return fretes.filter((f) => {
-    // Usa criado_em como referência de data do frete
     const dataCriacao = f.criado_em ? f.criado_em.slice(0, 10) : null
     if (!dataCriacao) return true
-
     if (inicio && dataCriacao < inicio) return false
     if (fim && dataCriacao > fim) return false
     return true
   })
+}
+
+function filtrarPorNumero(fretes: FreteComRelacoes[], busca: string): FreteComRelacoes[] {
+  if (!busca.trim()) return fretes
+  const termo = busca.trim().toLowerCase()
+  return fretes.filter((f) => f.numero_frete.toLowerCase().includes(termo))
 }
 
 export default function DashboardPage() {
@@ -46,6 +51,7 @@ export default function DashboardPage() {
   const [novoFreteOpen, setNovoFreteOpen] = useState(false)
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
+  const [buscaNumero, setBuscaNumero] = useState('')
 
   const { data: fretes, isLoading } = useQuery<FreteComRelacoes[]>({
     queryKey: ['fretes'],
@@ -54,8 +60,9 @@ export default function DashboardPage() {
 
   const fretesFiltrados = useMemo(() => {
     if (!fretes) return null
-    return filtrarPorPeriodo(fretes, periodoInicio, periodoFim)
-  }, [fretes, periodoInicio, periodoFim])
+    const porPeriodo = filtrarPorPeriodo(fretes, periodoInicio, periodoFim)
+    return filtrarPorNumero(porPeriodo, buscaNumero)
+  }, [fretes, periodoInicio, periodoFim, buscaNumero])
 
   const kpis = fretesFiltrados ? calcularKpis(fretesFiltrados) : null
 
@@ -71,10 +78,21 @@ export default function DashboardPage() {
           <h1 className="text-xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">Visão geral da operação em tempo real</p>
         </div>
-        <Button onClick={() => setNovoFreteOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Frete
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={buscaNumero}
+              onChange={(e) => setBuscaNumero(e.target.value)}
+              placeholder="Buscar nº do frete..."
+              className="pl-8 h-9 w-48 text-sm"
+            />
+          </div>
+          <Button onClick={() => setNovoFreteOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Frete
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -89,7 +107,7 @@ export default function DashboardPage() {
       ) : null}
 
       <div className="flex-1 min-h-0">
-        <KanbanBoard onCardClick={setFreteDetalhe} />
+        <KanbanBoard onCardClick={setFreteDetalhe} filtroNumero={buscaNumero} />
       </div>
 
       {freteDetalhe && (

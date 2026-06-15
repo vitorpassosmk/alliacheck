@@ -10,6 +10,7 @@ import type { StatusViagem } from '@/lib/state-machine'
 
 interface KanbanBoardProps {
   onCardClick: (frete: FreteComRelacoes) => void
+  filtroNumero?: string
 }
 
 async function fetchFretes(supabase: ReturnType<typeof createClient>) {
@@ -30,7 +31,7 @@ async function fetchFretes(supabase: ReturnType<typeof createClient>) {
   return (data ?? []) as FreteComRelacoes[]
 }
 
-export function KanbanBoard({ onCardClick }: KanbanBoardProps) {
+export function KanbanBoard({ onCardClick, filtroNumero }: KanbanBoardProps) {
   const supabase = createClient()
   const queryClient = useQueryClient()
 
@@ -54,9 +55,13 @@ export function KanbanBoard({ onCardClick }: KanbanBoardProps) {
     }
   }, [queryClient, supabase])
 
+  const fretesVisiveis = filtroNumero?.trim()
+    ? fretes.filter((f) => f.numero_frete.toLowerCase().includes(filtroNumero.trim().toLowerCase()))
+    : fretes
+
   const fretesPorStatus = COLUNAS_KANBAN.reduce<Record<StatusViagem, FreteComRelacoes[]>>(
     (acc, status) => {
-      acc[status] = fretes.filter((f) => f.status === status)
+      acc[status] = fretesVisiveis.filter((f) => f.status === status)
       return acc
     },
     {} as Record<StatusViagem, FreteComRelacoes[]>
