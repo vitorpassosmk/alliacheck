@@ -60,6 +60,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [temPlacasSeparadas, setTemPlacasSeparadas] = useState(false)
   const [placaCarreta, setPlacaCarreta] = useState('')
   const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
+  const [dataEntregaPrevistaForm, setDataEntregaPrevistaForm] = useState('')
 
   // Formulário PROGRAMADO → CARREGANDO
   const [numeroGr, setNumeroGr] = useState('')
@@ -145,6 +146,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         if (!frete?.data_carregamento && dataCarregamentoForm) {
           body.data_carregamento = dataCarregamentoForm
         }
+        if (!frete?.data_entrega_prevista && dataEntregaPrevistaForm) {
+          body.data_entrega_prevista = dataEntregaPrevistaForm
+        }
       }
       if (novoStatus === 'CARREGANDO') body.numero_gr = numeroGr
       if (novoStatus === 'CTE_EMITIDO') body.chave_cte = chaveCte
@@ -168,7 +172,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setChaveCte(''); setChaveCteError(''); setNumeroGr('')
       setMotoristaId(''); setVeiculoId(''); setNumeroContrato('')
       setNumeroCiot(''); setValorAdiantamento('')
-      setCustoAgregado(''); setDataCarregamentoForm('')
+      setCustoAgregado(''); setDataCarregamentoForm(''); setDataEntregaPrevistaForm('')
       setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta('')
       toast.success('Status atualizado')
     },
@@ -336,6 +340,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     dataCarregamentoExistente={frete.data_carregamento}
                     dataCarregamentoForm={dataCarregamentoForm}
                     setDataCarregamentoForm={setDataCarregamentoForm}
+                    dataEntregaPrevistaExistente={frete?.data_entrega_prevista ?? null}
+                    dataEntregaPrevistaForm={dataEntregaPrevistaForm}
+                    setDataEntregaPrevistaForm={setDataEntregaPrevistaForm}
                     numeroGr={numeroGr}
                     setNumeroGr={setNumeroGr}
                     chaveCte={chaveCte}
@@ -560,6 +567,9 @@ interface TransitionFormProps {
   dataCarregamentoExistente: string | null
   dataCarregamentoForm: string
   setDataCarregamentoForm: (v: string) => void
+  dataEntregaPrevistaExistente: string | null
+  dataEntregaPrevistaForm: string
+  setDataEntregaPrevistaForm: (v: string) => void
   numeroGr: string
   setNumeroGr: (v: string) => void
   chaveCte: string
@@ -582,6 +592,7 @@ function TransitionForm({
   valorAdiantamentoProgramado, setValorAdiantamentoProgramado,
   temPlacasSeparadas, setTemPlacasSeparadas, placaCarreta, setPlacaCarreta,
   dataCarregamentoExistente, dataCarregamentoForm, setDataCarregamentoForm,
+  dataEntregaPrevistaExistente, dataEntregaPrevistaForm, setDataEntregaPrevistaForm,
   numeroGr, setNumeroGr,
   chaveCte, setChaveCte, chaveCteError,
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
@@ -593,7 +604,10 @@ function TransitionForm({
   // ABERTO → PROGRAMADO
   if (status === 'ABERTO') {
     const veiculoSelecionado = veiculos.find(v => v.id === veiculoId) ?? null
-    const podeProgramar = !!motoristaId && !!veiculoId && (!!dataCarregamentoExistente || !!dataCarregamentoForm)
+    const podeProgramar =
+      !!motoristaId && !!veiculoId &&
+      (!!dataCarregamentoExistente || !!dataCarregamentoForm) &&
+      (!!dataEntregaPrevistaExistente || !!dataEntregaPrevistaForm)
 
     function handleVeiculoChange(id: string) {
       setVeiculoId(id)
@@ -678,6 +692,17 @@ function TransitionForm({
                 type="date"
                 value={dataCarregamentoForm}
                 onChange={e => setDataCarregamentoForm(e.target.value)}
+                className="max-w-xs"
+              />
+            </div>
+          )}
+          {!dataEntregaPrevistaExistente && (
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs text-muted-foreground">Data Prevista de Entrega *</label>
+              <Input
+                type="date"
+                value={dataEntregaPrevistaForm}
+                onChange={e => setDataEntregaPrevistaForm(e.target.value)}
                 className="max-w-xs"
               />
             </div>

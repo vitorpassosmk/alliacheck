@@ -32,7 +32,7 @@ export async function PATCH(
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, numero_frete, data_carregamento, valor_adiantamento')
+    .select('status, numero_frete, data_carregamento, valor_adiantamento, data_entrega_prevista')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -69,6 +69,15 @@ export async function PATCH(
         return Response.json({ error: 'Data de carregamento é obrigatória para programar o frete' }, { status: 422 })
       }
       camposAdicionais.data_carregamento = data_carregamento
+    }
+
+    // data_entrega_prevista: exigida se não foi informada na criação
+    if (!frete.data_entrega_prevista) {
+      const data_entrega_prevista = (body.data_entrega_prevista as string | undefined)?.trim()
+      if (!data_entrega_prevista) {
+        return Response.json({ error: 'Data prevista de entrega é obrigatória para programar o frete' }, { status: 422 })
+      }
+      camposAdicionais.data_entrega_prevista = data_entrega_prevista
     }
 
     // custo_agregado: valor total a pagar ao proprietário do caminhão
