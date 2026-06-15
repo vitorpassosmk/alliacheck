@@ -119,11 +119,27 @@ export async function PATCH(
     return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
   }
 
+  const { data: freteAtual } = await supabase
+    .from('fretes')
+    .select('status, numero_frete, excluido_em, origem_cidade, origem_uf, destino_cidade, destino_uf, cliente_id, motorista_id, veiculo_id, tipo_veiculo, tipo_produto, valor_frete, valor_mercadoria, custo_agregado, data_carregamento, data_entrega_prevista, data_entrega_real, observacoes')
+    .eq('id', id)
+    .single()
+
+  if (!freteAtual || freteAtual.excluido_em) {
+    return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
+  }
+  if (['CONCLUIDA', 'CANCELADO'].includes(freteAtual.status)) {
+    return Response.json({ error: 'Fretes CONCLUÍDOS ou CANCELADOS não podem ser editados' }, { status: 422 })
+  }
+
   const body = await request.json()
   const parsed = FreteUpdateSchema.safeParse(body)
   if (!parsed.success) {
     return Response.json({ error: parsed.error.flatten() }, { status: 422 })
   }
+
+  const camposAlterados = (Object.keys(parsed.data) as (keyof typeof parsed.data)[])
+    .filter(k => String(parsed.data[k] ?? '') !== String((freteAtual as Record<string, unknown>)[k] ?? ''))
 
   const { data, error } = await supabase
     .from('fretes')
@@ -144,7 +160,9 @@ export async function PATCH(
   await supabase.from('eventos').insert({
     frete_id: id,
     tipo: 'FRETE_EDITADO',
-    descricao: 'Dados do frete editados',
+    descricao: camposAlterados.length > 0
+      ? `Campos editados: ${camposAlterados.join(', ')}`
+      : 'Dados do frete editados (sem alterações detectadas)',
     usuario_id: user.id,
     ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
     user_agent: request.headers.get('user-agent'),

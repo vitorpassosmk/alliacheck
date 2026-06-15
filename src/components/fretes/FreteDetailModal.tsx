@@ -243,7 +243,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     frete !== undefined &&
     !['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)
 
-  const podeEditar = ['ADMIN', 'SUPERVISOR'].includes(papel ?? '')
+  const podeEditar =
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
+    frete !== undefined &&
+    !['CONCLUIDA', 'CANCELADO'].includes(frete.status)
 
   const editDefaultValues = frete ? {
     numero_frete: frete.numero_frete,
