@@ -1,6 +1,6 @@
 # ALLiA Check — TODO
 
-Última atualização: 2026-06-15 (sessão: revisão de segurança e qualidade)
+Última atualização: 2026-06-16 (sessão: testes, commit e deploy produção)
 
 ---
 
@@ -88,7 +88,7 @@
 - [ ] Rollback de auth.createUser se insert em public.users falhar (usuário órfão)
 - [ ] toggleItem no checklist: tratar erro de rede e bloquear clique duplo no frontend
 - [ ] GET /api/fretes no dashboard: verificar res.ok antes de parsear JSON
-- [ ] Verificar regra de cancelamento: CLAUDE.md diz "apenas ADMIN" mas código permite SUPERVISOR (decisão deliberada — atualizar CLAUDE.md se for manter SUPERVISOR)
+- [x] CLAUDE.md atualizado: cancelamento por SUPERVISOR alinhado com o código (decisão deliberada mantida)
 
 ---
 
@@ -103,4 +103,4 @@
 - **Placas por viagem:** `placa_cavalo` e `placa_carreta` em fretes são específicos da viagem e nunca alteram o cadastro em `veiculos`.
 - **Race conditions em pagamentos:** UPDATE de adiantamento e pagamento final incluem filtros de status e null-check na própria cláusula `.update()` para garantir idempotência sem transação explícita.
 - **extractIp:** helper centralizado em `lib/api-helpers.ts` extrai só o primeiro IP do x-forwarded-for; evita gravar a cadeia de proxies Vercel/Cloudflare inteira nos eventos de auditoria.
-- **Cancelamento por SUPERVISOR:** código permite SUPERVISOR cancelar fretes (comentário explícito no FreteDetailModal). CLAUDE.md diz "apenas ADMIN" — divergência a resolver com o time.
+- **Cancelamento por SUPERVISOR:** código permite SUPERVISOR cancelar fretes (decisão deliberada). CLAUDE.md atualizado para refletir o código.

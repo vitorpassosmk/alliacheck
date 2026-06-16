@@ -649,7 +649,9 @@ function TransitionForm({
   // ABERTO → PROGRAMADO
   if (status === 'ABERTO') {
     const veiculoSelecionado = veiculos.find(v => v.id === veiculoId) ?? null
-    const custoOk = custoAgregadoExistente !== null || !!custoAgregado
+    const motoristaSelecionado = motoristas.find(m => m.id === motoristaId) ?? null
+    const custoObrigatorio = !(motoristaSelecionado?.tipo_motorista === 'FROTA' && veiculoSelecionado?.tipo_veiculo === 'FROTA')
+    const custoOk = custoAgregadoExistente !== null || !custoObrigatorio || !!custoAgregado
     const podeProgramar =
       !!motoristaId && !!veiculoId &&
       (!!dataCarregamentoExistente || !!dataCarregamentoForm) &&
@@ -786,7 +788,9 @@ function TransitionForm({
           ) : (
             <div className="space-y-1 col-span-2">
               <label className="text-xs text-muted-foreground">
-                Custo do Agregado (R$) * — valor total a pagar ao proprietário
+                Custo do Agregado (R$){custoObrigatorio
+                  ? ' * — valor total a pagar ao proprietário'
+                  : ' — valor total a pagar ao proprietário (opcional para FROTA)'}
               </label>
               <Input
                 type="number"

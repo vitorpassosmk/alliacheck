@@ -70,6 +70,13 @@ export async function PATCH(
     camposAdicionais.motorista_id = motorista_id
     camposAdicionais.veiculo_id = veiculo_id
 
+    // Determina se custo_agregado é obrigatório com base no tipo do motorista e veículo
+    const [{ data: motoristaDados }, { data: veiculoDados }] = await Promise.all([
+      supabase.from('motoristas').select('tipo_motorista').eq('id', motorista_id).single(),
+      supabase.from('veiculos').select('tipo_veiculo').eq('id', veiculo_id).single(),
+    ])
+    const custoObrigatorio = !(motoristaDados?.tipo_motorista === 'FROTA' && veiculoDados?.tipo_veiculo === 'FROTA')
+
     // data_carregamento: exigida aqui se não foi informada na criação do frete
     if (!frete.data_carregamento) {
       const data_carregamento = (body.data_carregamento as string | undefined)?.trim()
@@ -88,13 +95,17 @@ export async function PATCH(
       camposAdicionais.data_entrega_prevista = data_entrega_prevista
     }
 
-    // custo_agregado: obrigatório se ainda não foi definido na criação do frete
+    // custo_agregado: obrigatório quando motorista ou veículo for AGREGADO; opcional se ambos forem FROTA
     const custo_agregado = body.custo_agregado as number | undefined
     if (!frete.custo_agregado) {
-      if (custo_agregado === undefined || custo_agregado <= 0) {
-        return Response.json({ error: 'Custo do agregado é obrigatório para programar o frete' }, { status: 422 })
+      if (custoObrigatorio) {
+        if (custo_agregado === undefined || custo_agregado <= 0) {
+          return Response.json({ error: 'Custo do agregado é obrigatório para programar o frete com motorista ou veículo agregado' }, { status: 422 })
+        }
+        camposAdicionais.custo_agregado = custo_agregado
+      } else if (custo_agregado !== undefined && custo_agregado > 0) {
+        camposAdicionais.custo_agregado = custo_agregado
       }
-      camposAdicionais.custo_agregado = custo_agregado
     } else if (custo_agregado !== undefined) {
       if (custo_agregado <= 0) {
         return Response.json({ error: 'Custo do agregado deve ser maior que zero' }, { status: 422 })
