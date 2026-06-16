@@ -35,13 +35,15 @@ function formatCurrency(value: number | null) {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('pt-BR')
+  // date-only strings (YYYY-MM-DD) are parsed as UTC by JS, causing off-by-one in UTC-3
+  const [year, month, day] = dateStr.split('T')[0].split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR')
 }
 
 function TableRowSkeleton() {
   return (
     <TableRow>
-      {Array.from({ length: 9 }).map((_, i) => (
+      {Array.from({ length: 10 }).map((_, i) => (
         <TableCell key={i}>
           <Skeleton className="h-5 w-full" />
         </TableCell>
@@ -168,6 +170,7 @@ export default function FretesPage() {
               <TableHead>Status</TableHead>
               <TableHead>CT-e</TableHead>
               <TableHead>Carregamento</TableHead>
+              <TableHead>Data Prevista</TableHead>
               <TableHead>Descarga</TableHead>
               <TableHead className="text-right">Valor</TableHead>
             </TableRow>
@@ -177,7 +180,7 @@ export default function FretesPage() {
               Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} />)
             ) : fretefiltrados.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                   {busca || statusFiltro !== 'TODOS'
                     ? 'Nenhum frete encontrado com os filtros aplicados.'
                     : 'Nenhum frete cadastrado ainda.'}
@@ -190,8 +193,8 @@ export default function FretesPage() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => setFreteDetalhe(frete)}
                 >
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    #{frete.id.slice(-6).toUpperCase()}
+                  <TableCell className="font-mono text-sm font-bold">
+                    {frete.numero_frete}
                   </TableCell>
                   <TableCell className="font-medium">
                     {frete.clientes?.razao_social ?? '—'}
@@ -211,6 +214,7 @@ export default function FretesPage() {
                     {frete.chave_cte ? frete.chave_cte.slice(-8) : '—'}
                   </TableCell>
                   <TableCell>{formatDate(frete.data_carregamento)}</TableCell>
+                  <TableCell>{formatDate(frete.data_entrega_prevista)}</TableCell>
                   <TableCell>{formatDate(frete.data_entrega_real)}</TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {formatCurrency(frete.valor_frete)}
