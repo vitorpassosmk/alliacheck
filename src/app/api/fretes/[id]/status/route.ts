@@ -32,7 +32,7 @@ export async function PATCH(
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, numero_frete, data_carregamento, valor_adiantamento, data_entrega_prevista')
+    .select('status, numero_frete, data_carregamento, valor_adiantamento, data_entrega_prevista, custo_agregado')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -80,9 +80,14 @@ export async function PATCH(
       camposAdicionais.data_entrega_prevista = data_entrega_prevista
     }
 
-    // custo_agregado: valor total a pagar ao proprietário do caminhão
+    // custo_agregado: obrigatório se ainda não foi definido na criação do frete
     const custo_agregado = body.custo_agregado as number | undefined
-    if (custo_agregado !== undefined) {
+    if (!frete.custo_agregado) {
+      if (custo_agregado === undefined || custo_agregado <= 0) {
+        return Response.json({ error: 'Custo do agregado é obrigatório para programar o frete' }, { status: 422 })
+      }
+      camposAdicionais.custo_agregado = custo_agregado
+    } else if (custo_agregado !== undefined) {
       if (custo_agregado <= 0) {
         return Response.json({ error: 'Custo do agregado deve ser maior que zero' }, { status: 422 })
       }
@@ -104,6 +109,20 @@ export async function PATCH(
       camposAdicionais.placa_carreta = placa_carreta
         ? placa_carreta.trim().toUpperCase().slice(0, 8)
         : null
+    }
+
+    // placa_cavalo: placa do cavalo (trator) quando diferente da registrada no veículo
+    const placa_cavalo = body.placa_cavalo as string | null | undefined
+    if (placa_cavalo !== undefined) {
+      camposAdicionais.placa_cavalo = placa_cavalo
+        ? placa_cavalo.trim().toUpperCase().slice(0, 8)
+        : null
+    }
+
+    // motorista_e_funcionario_agregado: flag ANTT — motorista é funcionário do proprietário do veículo
+    const motorista_e_funcionario_agregado = body.motorista_e_funcionario_agregado as boolean | undefined
+    if (motorista_e_funcionario_agregado !== undefined) {
+      camposAdicionais.motorista_e_funcionario_agregado = !!motorista_e_funcionario_agregado
     }
   }
 

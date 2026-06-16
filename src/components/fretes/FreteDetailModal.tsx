@@ -59,6 +59,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [valorAdiantamentoProgramado, setValorAdiantamentoProgramado] = useState('')
   const [temPlacasSeparadas, setTemPlacasSeparadas] = useState(false)
   const [placaCarreta, setPlacaCarreta] = useState('')
+  const [placaCavalo, setPlacaCavalo] = useState('')
+  const [motoristaFuncionarioAgregado, setMotoristaFuncionarioAgregado] = useState(false)
   const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
   const [dataEntregaPrevistaForm, setDataEntregaPrevistaForm] = useState('')
 
@@ -140,9 +142,11 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       if (novoStatus === 'PROGRAMADO') {
         body.motorista_id = motoristaId
         body.veiculo_id = veiculoId
-        if (custoAgregado) body.custo_agregado = parsePositive(custoAgregado)
+        if (!frete?.custo_agregado) body.custo_agregado = parsePositive(custoAgregado)
         if (valorAdiantamentoProgramado) body.valor_adiantamento = parsePositive(valorAdiantamentoProgramado)
         body.placa_carreta = temPlacasSeparadas ? placaCarreta.trim() || null : null
+        body.placa_cavalo = temPlacasSeparadas ? placaCavalo.trim() || null : null
+        body.motorista_e_funcionario_agregado = motoristaFuncionarioAgregado
         if (!frete?.data_carregamento && dataCarregamentoForm) {
           body.data_carregamento = dataCarregamentoForm
         }
@@ -176,7 +180,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setMotoristaId(''); setVeiculoId(''); setNumeroContrato('')
       setNumeroCiot(''); setValorAdiantamento('')
       setCustoAgregado(''); setDataCarregamentoForm(''); setDataEntregaPrevistaForm('')
-      setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta('')
+      setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta(''); setPlacaCavalo('')
+      setMotoristaFuncionarioAgregado(false)
       setDataDescarga('')
       toast.success('Status atualizado')
     },
@@ -333,6 +338,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setMotoristaId={setMotoristaId}
                     veiculoId={veiculoId}
                     setVeiculoId={setVeiculoId}
+                    custoAgregadoExistente={frete.custo_agregado ?? null}
                     custoAgregado={custoAgregado}
                     setCustoAgregado={setCustoAgregado}
                     valorAdiantamentoProgramado={valorAdiantamentoProgramado}
@@ -341,6 +347,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setTemPlacasSeparadas={setTemPlacasSeparadas}
                     placaCarreta={placaCarreta}
                     setPlacaCarreta={setPlacaCarreta}
+                    placaCavalo={placaCavalo}
+                    setPlacaCavalo={setPlacaCavalo}
+                    motoristaFuncionarioAgregado={motoristaFuncionarioAgregado}
+                    setMotoristaFuncionarioAgregado={setMotoristaFuncionarioAgregado}
                     dataCarregamentoExistente={frete.data_carregamento}
                     dataCarregamentoForm={dataCarregamentoForm}
                     setDataCarregamentoForm={setDataCarregamentoForm}
@@ -421,8 +431,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Truck className="h-4 w-4 shrink-0" />
                       <span>
-                        {frete.veiculos.placa}
-                        {frete.placa_carreta && ` + ${frete.placa_carreta}`}
+                        {frete.placa_cavalo
+                          ? `Cavalo: ${frete.placa_cavalo}`
+                          : frete.veiculos.placa}
+                        {frete.placa_carreta && ` + Carreta: ${frete.placa_carreta}`}
                         {' — '}{frete.veiculos.tipo}
                       </span>
                     </div>
@@ -560,6 +572,7 @@ interface TransitionFormProps {
   setMotoristaId: (v: string) => void
   veiculoId: string
   setVeiculoId: (v: string) => void
+  custoAgregadoExistente: number | null
   custoAgregado: string
   setCustoAgregado: (v: string) => void
   valorAdiantamentoProgramado: string
@@ -568,6 +581,10 @@ interface TransitionFormProps {
   setTemPlacasSeparadas: (v: boolean) => void
   placaCarreta: string
   setPlacaCarreta: (v: string) => void
+  placaCavalo: string
+  setPlacaCavalo: (v: string) => void
+  motoristaFuncionarioAgregado: boolean
+  setMotoristaFuncionarioAgregado: (v: boolean) => void
   dataCarregamentoExistente: string | null
   dataCarregamentoForm: string
   setDataCarregamentoForm: (v: string) => void
@@ -593,9 +610,12 @@ function TransitionForm({
   status, nextStatus, isPending, onAvancar,
   motoristas, veiculos, usarDisponiveis,
   motoristaId, setMotoristaId, veiculoId, setVeiculoId,
-  custoAgregado, setCustoAgregado,
+  custoAgregadoExistente, custoAgregado, setCustoAgregado,
   valorAdiantamentoProgramado, setValorAdiantamentoProgramado,
-  temPlacasSeparadas, setTemPlacasSeparadas, placaCarreta, setPlacaCarreta,
+  temPlacasSeparadas, setTemPlacasSeparadas,
+  placaCarreta, setPlacaCarreta,
+  placaCavalo, setPlacaCavalo,
+  motoristaFuncionarioAgregado, setMotoristaFuncionarioAgregado,
   dataCarregamentoExistente, dataCarregamentoForm, setDataCarregamentoForm,
   dataEntregaPrevistaExistente, dataEntregaPrevistaForm, setDataEntregaPrevistaForm,
   numeroGr, setNumeroGr,
@@ -609,19 +629,23 @@ function TransitionForm({
   // ABERTO → PROGRAMADO
   if (status === 'ABERTO') {
     const veiculoSelecionado = veiculos.find(v => v.id === veiculoId) ?? null
+    const custoOk = custoAgregadoExistente !== null || !!custoAgregado
     const podeProgramar =
       !!motoristaId && !!veiculoId &&
       (!!dataCarregamentoExistente || !!dataCarregamentoForm) &&
-      (!!dataEntregaPrevistaExistente || !!dataEntregaPrevistaForm)
+      (!!dataEntregaPrevistaExistente || !!dataEntregaPrevistaForm) &&
+      custoOk
 
     function handleVeiculoChange(id: string) {
       setVeiculoId(id)
       const v = veiculos.find(vv => vv.id === id)
       if (v?.tem_placas_separadas) {
         setTemPlacasSeparadas(true)
+        setPlacaCavalo(v.placa ?? '')
         setPlacaCarreta(v.placa_carreta ?? '')
       } else {
         setTemPlacasSeparadas(false)
+        setPlacaCavalo('')
         setPlacaCarreta('')
       }
     }
@@ -666,8 +690,13 @@ function TransitionForm({
                   checked={temPlacasSeparadas}
                   onCheckedChange={(v) => {
                     setTemPlacasSeparadas(v === true)
-                    if (!v) setPlacaCarreta('')
-                    else if (veiculoSelecionado?.placa_carreta) setPlacaCarreta(veiculoSelecionado.placa_carreta)
+                    if (!v) {
+                      setPlacaCavalo('')
+                      setPlacaCarreta('')
+                    } else {
+                      setPlacaCavalo(veiculoSelecionado?.placa ?? '')
+                      setPlacaCarreta(veiculoSelecionado?.placa_carreta ?? '')
+                    }
                   }}
                 />
                 <label htmlFor="tem-placas-separadas" className="text-xs text-muted-foreground cursor-pointer select-none">
@@ -675,15 +704,27 @@ function TransitionForm({
                 </label>
               </div>
               {temPlacasSeparadas && (
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Placa da Carreta</label>
-                  <Input
-                    value={placaCarreta}
-                    onChange={e => setPlacaCarreta(e.target.value.toUpperCase())}
-                    placeholder="Ex: ABC1D23"
-                    className="max-w-xs uppercase"
-                    maxLength={8}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Placa do Cavalo (trator)</label>
+                    <Input
+                      value={placaCavalo}
+                      onChange={e => setPlacaCavalo(e.target.value.toUpperCase())}
+                      placeholder="Ex: ABC1D23"
+                      className="uppercase"
+                      maxLength={8}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Placa da Carreta</label>
+                    <Input
+                      value={placaCarreta}
+                      onChange={e => setPlacaCarreta(e.target.value.toUpperCase())}
+                      placeholder="Ex: ABC1D23"
+                      className="uppercase"
+                      maxLength={8}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -713,21 +754,50 @@ function TransitionForm({
             </div>
           )}
 
-          {/* Custo do Agregado */}
-          <div className="space-y-1 col-span-2">
-            <label className="text-xs text-muted-foreground">
-              Custo do Agregado (R$) — valor total a pagar ao proprietário
-            </label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={custoAgregado}
-              onChange={e => setCustoAgregado(e.target.value)}
-              placeholder="0,00"
-              className="max-w-xs"
-            />
-          </div>
+          {/* Custo do Agregado — obrigatório se não definido na criação */}
+          {custoAgregadoExistente !== null ? (
+            <div className="col-span-2 space-y-1 p-3 bg-muted/40 rounded-md border">
+              <p className="text-xs text-muted-foreground font-medium">Custo do Agregado (R$)</p>
+              <p className="text-sm font-semibold">
+                R$ {custoAgregadoExistente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground/70">Definido na criação — use Editar para alterar</p>
+            </div>
+          ) : (
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs text-muted-foreground">
+                Custo do Agregado (R$) * — valor total a pagar ao proprietário
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={custoAgregado}
+                onChange={e => setCustoAgregado(e.target.value)}
+                placeholder="0,00"
+                className="max-w-xs"
+              />
+            </div>
+          )}
+
+          {/* Motorista funcionário agregado ao proprietário */}
+          {veiculoId && (
+            <div className="col-span-2 flex items-start gap-2 pt-1">
+              <Checkbox
+                id="motorista-funcionario-agregado"
+                checked={motoristaFuncionarioAgregado}
+                onCheckedChange={(v) => setMotoristaFuncionarioAgregado(v === true)}
+              />
+              <div>
+                <label htmlFor="motorista-funcionario-agregado" className="text-xs text-muted-foreground cursor-pointer select-none">
+                  Motorista é funcionário agregado ao proprietário do veículo
+                </label>
+                <p className="text-xs text-muted-foreground/60">
+                  Pela ANTT, o adiantamento pode ser pago ao proprietário ou ao seu funcionário
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Valor de Adiantamento */}
           <div className="space-y-1 col-span-2">
@@ -924,7 +994,10 @@ function LiberacaoPanel({
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  // Case A: motorista é o próprio proprietário do veículo (CPF idêntico)
+  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  // Case B: motorista é funcionário agregado ao proprietário (marcado explicitamente)
+  const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   return (
     <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg space-y-4">
@@ -983,6 +1056,9 @@ function LiberacaoPanel({
           <div className="space-y-1">
             <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Motorista</p>
             <p>{m.nome}</p>
+            {funcionarioAgregado && (
+              <p className="text-xs text-amber-700 font-medium">Funcionário agregado ao proprietário</p>
+            )}
             <p className="text-muted-foreground">CNH: {m.cnh}</p>
             {m.validade_cnh && (
               <p className="text-muted-foreground">
@@ -1008,42 +1084,44 @@ function LiberacaoPanel({
           )}
         </div>
 
-        {motoristaPropriétario ? (
-          m && (m.banco || m.agencia_conta || m.chave_pix) ? (
-            <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
-              <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
-                <CreditCard className="h-3 w-3" /> Dados para Pagamento — Motorista / Proprietário
-              </p>
-              {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
-              {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
-              {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
-            </div>
-          ) : null
-        ) : (
-          <>
-            {v && (v.banco_proprietario || v.agencia_conta_proprietario || v.chave_pix_proprietario) && (
-              <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
-                <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
-                  <CreditCard className="h-3 w-3" /> Dados para Pagamento — Proprietário do Veículo
-                  {v.proprietario && <span className="ml-1 normal-case font-normal">({v.proprietario})</span>}
-                </p>
-                {v.banco_proprietario && <p className="text-muted-foreground">Banco: {v.banco_proprietario}</p>}
-                {v.agencia_conta_proprietario && <p className="text-muted-foreground">Ag/Conta: {v.agencia_conta_proprietario}</p>}
-                {v.chave_pix_proprietario && <p className="text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
-              </div>
-            )}
-            {m && (m.banco || m.agencia_conta || m.chave_pix) && (
-              <div className="col-span-2 space-y-1">
-                <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <CreditCard className="h-3 w-3" /> Dados Bancários — Motorista
-                  <span className="normal-case font-normal text-amber-600">(não é o proprietário)</span>
-                </p>
-                {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
-                {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
-                {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
-              </div>
-            )}
-          </>
+        {/* Case A: motorista é o próprio proprietário */}
+        {motoristaEProprietario && m && (m.banco || m.agencia_conta || m.chave_pix) && (
+          <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
+            <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
+              <CreditCard className="h-3 w-3" /> Dados para Pagamento — Motorista / Proprietário
+            </p>
+            {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
+            {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
+            {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
+          </div>
+        )}
+
+        {/* Case B e C: motorista não é o proprietário — exibe proprietário sempre */}
+        {!motoristaEProprietario && v && (v.banco_proprietario || v.agencia_conta_proprietario || v.chave_pix_proprietario) && (
+          <div className="col-span-2 space-y-1 bg-green-50 border border-green-200 rounded-md p-3">
+            <p className="font-medium text-xs text-green-800 uppercase tracking-wide flex items-center gap-1">
+              <CreditCard className="h-3 w-3" /> Dados para Pagamento — Proprietário do Veículo
+              {v.proprietario && <span className="ml-1 normal-case font-normal">({v.proprietario})</span>}
+            </p>
+            {v.banco_proprietario && <p className="text-muted-foreground">Banco: {v.banco_proprietario}</p>}
+            {v.agencia_conta_proprietario && <p className="text-muted-foreground">Ag/Conta: {v.agencia_conta_proprietario}</p>}
+            {v.chave_pix_proprietario && <p className="text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
+          </div>
+        )}
+
+        {/* Case B: funcionário agregado — exibe também os dados do motorista */}
+        {!motoristaEProprietario && funcionarioAgregado && m && (m.banco || m.agencia_conta || m.chave_pix) && (
+          <div className="col-span-2 space-y-1 bg-amber-50 border border-amber-200 rounded-md p-3">
+            <p className="font-medium text-xs text-amber-800 uppercase tracking-wide flex items-center gap-1">
+              <CreditCard className="h-3 w-3" /> Dados Bancários — Motorista (funcionário agregado)
+            </p>
+            <p className="text-xs text-amber-700/80 mb-1">
+              O pagamento pode ser feito ao proprietário ou ao motorista conforme acordado
+            </p>
+            {m.banco && <p className="text-muted-foreground">Banco: {m.banco}</p>}
+            {m.agencia_conta && <p className="text-muted-foreground">Ag/Conta: {m.agencia_conta}</p>}
+            {m.chave_pix && <p className="text-muted-foreground">PIX: {m.chave_pix}</p>}
+          </div>
         )}
       </div>
     </div>

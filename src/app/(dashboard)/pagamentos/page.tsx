@@ -258,6 +258,88 @@ export default function PagamentosPage() {
 // Modal — dados bancários
 // ---------------------------------------------------------------------------
 
+function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
+  const m = frete.motoristas
+  const v = frete.veiculos
+  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
+
+  function BlocoItem({ label, nome, banco, conta, pix, variant = 'green' }: {
+    label: string; nome?: string | null; banco?: string | null
+    conta?: string | null; pix?: string | null; variant?: 'green' | 'amber'
+  }) {
+    const bg = variant === 'green' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
+    const titleColor = variant === 'green' ? 'text-green-800' : 'text-amber-800'
+    return (
+      <div className={`border rounded-lg p-4 space-y-3 ${bg}`}>
+        <p className={`text-xs font-medium uppercase tracking-wide ${titleColor}`}>{label}</p>
+        {nome && <p className="font-semibold text-base">{nome}</p>}
+        {banco ? (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Banco</span>
+              <span className="font-medium">{banco}</span>
+            </div>
+            {conta && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Agência / Conta</span>
+                <span className="font-mono font-medium">{conta}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">Dados bancários não cadastrados</p>
+        )}
+        {pix && (
+          <div className="bg-white/60 border border-current/10 rounded-md p-3">
+            <p className={`text-xs font-medium mb-1 ${titleColor}`}>Chave PIX</p>
+            <p className="font-mono text-sm break-all">{pix}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (motoristaEProprietario) {
+    return (
+      <BlocoItem
+        label="Motorista / Proprietário"
+        nome={m?.nome}
+        banco={m?.banco}
+        conta={m?.agencia_conta}
+        pix={m?.chave_pix}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <BlocoItem
+        label={`Proprietário do Veículo${v?.proprietario ? ` — ${v.proprietario}` : ''}`}
+        nome={v?.proprietario ?? v?.placa}
+        banco={v?.banco_proprietario}
+        conta={v?.agencia_conta_proprietario}
+        pix={v?.chave_pix_proprietario}
+      />
+      {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+        <BlocoItem
+          label="Motorista (funcionário agregado)"
+          nome={m.nome}
+          banco={m.banco}
+          conta={m.agencia_conta}
+          pix={m.chave_pix}
+          variant="amber"
+        />
+      )}
+      {funcionarioAgregado && (
+        <p className="text-xs text-amber-700">
+          O pagamento pode ser feito ao proprietário ou ao motorista (funcionário agregado) conforme acordado
+        </p>
+      )}
+    </div>
+  )
+}
+
 function ModalDadosBancarios({
   frete,
   open,
@@ -270,23 +352,6 @@ function ModalDadosBancarios({
   if (!frete) return null
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
-
-  const banco = motoristaPropriétario
-    ? {
-        nome: m?.nome,
-        banco: m?.banco,
-        conta: m?.agencia_conta,
-        pix: m?.chave_pix,
-        label: 'Motorista / Proprietário',
-      }
-    : {
-        nome: v?.proprietario ?? v?.placa,
-        banco: v?.banco_proprietario,
-        conta: v?.agencia_conta_proprietario,
-        pix: v?.chave_pix_proprietario,
-        label: 'Proprietário do Veículo',
-      }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -306,33 +371,7 @@ function ModalDadosBancarios({
             {m && <p className="text-muted-foreground">Motorista: {m.nome}</p>}
             {v && <p className="text-muted-foreground">Veículo: {v.placa}</p>}
           </div>
-
-          <div className="border rounded-lg p-4 space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{banco.label}</p>
-            {banco.nome && <p className="font-semibold text-lg">{banco.nome}</p>}
-            {banco.banco ? (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Banco</span>
-                  <span className="font-medium">{banco.banco}</span>
-                </div>
-                {banco.conta && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Agência / Conta</span>
-                    <span className="font-mono font-medium">{banco.conta}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Dados bancários não cadastrados</p>
-            )}
-            {banco.pix && (
-              <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                <p className="text-xs text-green-700 font-medium mb-1">Chave PIX</p>
-                <p className="font-mono text-sm break-all">{banco.pix}</p>
-              </div>
-            )}
-          </div>
+          <BlocosBancarios frete={frete} />
         </div>
       </DialogContent>
     </Dialog>
@@ -384,7 +423,8 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   return (
     <>
@@ -432,35 +472,38 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
             </div>
           )}
 
-          {/* Dados bancários */}
-          {motoristaPropriétario ? (
+          {/* Dados bancários — lógica 3 casos */}
+          {motoristaEProprietario ? (
             m && (m.banco || m.chave_pix) && (
               <div className="border-t pt-2 space-y-1">
                 <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                   <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
                 </p>
-                {m.banco && (
-                  <p className="text-xs">{m.banco} · {m.agencia_conta}</p>
-                )}
-                {m.chave_pix && (
-                  <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>
-                )}
+                {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
               </div>
             )
           ) : (
-            v && (v.banco_proprietario || v.chave_pix_proprietario) && (
-              <div className="border-t pt-2 space-y-1">
-                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
-                  <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
-                </p>
-                {v.banco_proprietario && (
-                  <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
-                )}
-                {v.chave_pix_proprietario && (
-                  <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
-                )}
-              </div>
-            )
+            <div className="border-t pt-2 space-y-2">
+              {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                    <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
+                  </p>
+                  {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
+                  {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
+                </div>
+              )}
+              {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+                <div className="space-y-1 pt-1 border-t border-amber-200">
+                  <p className="text-xs font-medium flex items-center gap-1.5 text-amber-800">
+                    <CreditCard className="h-3 w-3" /> Motorista (funcionário agregado)
+                  </p>
+                  {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                  {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="border-t pt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
@@ -557,7 +600,8 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaPropriétario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   return (
     <>
@@ -590,7 +634,7 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
             </div>
           )}
 
-          {/* Item 11: detalhe financeiro — custo, adiantamento, restante */}
+          {/* Detalhe financeiro — custo, adiantamento, restante */}
           <div className="bg-gray-50 rounded-md p-3 space-y-2 text-xs">
             {frete.custo_agregado && (
               <div className="flex justify-between">
@@ -622,35 +666,38 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
             )}
           </div>
 
-          {/* Dados bancários — lógica exclusiva: motorista/proprietário OU proprietário */}
-          {motoristaPropriétario ? (
+          {/* Dados bancários — lógica 3 casos */}
+          {motoristaEProprietario ? (
             m && (m.banco || m.chave_pix) ? (
               <div className="border-t pt-2 space-y-1">
                 <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                   <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
                 </p>
-                {m.banco && (
-                  <p className="text-xs">{m.banco} · {m.agencia_conta}</p>
-                )}
-                {m.chave_pix && (
-                  <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>
-                )}
+                {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
               </div>
             ) : null
           ) : (
-            v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
-              <div className="border-t pt-2 space-y-1">
-                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
-                  <CreditCard className="h-3 w-3" /> Banco — Proprietário ({v.proprietario ?? v.placa})
-                </p>
-                {v.banco_proprietario && (
-                  <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>
-                )}
-                {v.chave_pix_proprietario && (
-                  <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>
-                )}
-              </div>
-            ) : null
+            <div className="border-t pt-2 space-y-2">
+              {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
+                    <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
+                  </p>
+                  {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
+                  {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
+                </div>
+              )}
+              {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+                <div className="space-y-1 pt-1 border-t border-amber-200">
+                  <p className="text-xs font-medium flex items-center gap-1.5 text-amber-800">
+                    <CreditCard className="h-3 w-3" /> Motorista (funcionário agregado)
+                  </p>
+                  {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                  {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="border-t pt-3" onClick={(e) => e.stopPropagation()}>

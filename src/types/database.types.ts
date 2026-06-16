@@ -264,6 +264,8 @@ export type Database = {
           excluido_em: string | null
           excluido_por: string | null
           placa_carreta: string | null
+          placa_cavalo: string | null
+          motorista_e_funcionario_agregado: boolean
           checklist_liberacao_ok: boolean
         }
         Insert: {
@@ -301,6 +303,8 @@ export type Database = {
           excluido_em?: string | null
           excluido_por?: string | null
           placa_carreta?: string | null
+          placa_cavalo?: string | null
+          motorista_e_funcionario_agregado?: boolean
           checklist_liberacao_ok?: boolean
         }
         Update: {
@@ -338,6 +342,8 @@ export type Database = {
           excluido_em?: string | null
           excluido_por?: string | null
           placa_carreta?: string | null
+          placa_cavalo?: string | null
+          motorista_e_funcionario_agregado?: boolean
           checklist_liberacao_ok?: boolean
         }
         Relationships: [
