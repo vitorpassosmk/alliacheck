@@ -167,14 +167,14 @@ export default function VeiculosPage() {
                     <Badge variant="secondary" className="text-xs">{v.tipo_veiculo}</Badge>
                   )}
                 </div>
+                {v.tag && (
+                  <p className="text-xs font-mono text-muted-foreground">TAG: {v.tag}</p>
+                )}
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   {v.modelo && <span>{v.modelo}</span>}
                   {v.ano && <><span>·</span><span>{v.ano}</span></>}
                   {v.proprietario && <><span>·</span><span>{v.proprietario}</span></>}
                   {v.rntrc && <><span>·</span><span>RNTRC: {v.rntrc}</span></>}
-                  {v.tag && (
-                    <><span>·</span><span>TAG: {v.tag}</span></>
-                  )}
                 </div>
               </div>
               {podeGerenciar && (

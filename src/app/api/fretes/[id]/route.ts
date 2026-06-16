@@ -27,9 +27,6 @@ export async function DELETE(
 
   if (!frete) return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
   if (frete.excluido_em) return Response.json({ error: 'Frete já excluído' }, { status: 409 })
-  if (['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)) {
-    return Response.json({ error: 'Fretes EM VIAGEM ou CONCLUÍDA não podem ser excluídos' }, { status: 422 })
-  }
 
   const { error: updateError } = await supabase
     .from('fretes')
@@ -41,7 +38,7 @@ export async function DELETE(
   await supabase.from('eventos').insert({
     frete_id: id,
     tipo: 'FRETE_EXCLUIDO',
-    descricao: `Frete ${frete.numero_frete} excluído por ${perfil?.papel ?? 'DESCONHECIDO'}`,
+    descricao: `Frete ${frete.numero_frete} (status: ${frete.status}) excluído por ${perfil?.papel ?? 'DESCONHECIDO'}`,
     usuario_id: user.id,
     ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
     user_agent: request.headers.get('user-agent'),
@@ -128,9 +125,6 @@ export async function PATCH(
   if (!freteAtual || freteAtual.excluido_em) {
     return Response.json({ error: 'Frete não encontrado' }, { status: 404 })
   }
-  if (['CONCLUIDA', 'CANCELADO'].includes(freteAtual.status)) {
-    return Response.json({ error: 'Fretes CONCLUÍDOS ou CANCELADOS não podem ser editados' }, { status: 422 })
-  }
 
   const body = await request.json()
   const parsed = FreteUpdateSchema.safeParse(body)
@@ -161,8 +155,8 @@ export async function PATCH(
     frete_id: id,
     tipo: 'FRETE_EDITADO',
     descricao: camposAlterados.length > 0
-      ? `Campos editados: ${camposAlterados.join(', ')}`
-      : 'Dados do frete editados (sem alterações detectadas)',
+      ? `Campos editados (status: ${freteAtual.status}): ${camposAlterados.join(', ')}`
+      : `Dados do frete editados (status: ${freteAtual.status}) — sem alterações detectadas`,
     usuario_id: user.id,
     ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
     user_agent: request.headers.get('user-agent'),

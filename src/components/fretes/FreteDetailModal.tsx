@@ -252,14 +252,16 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     !['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
 
   const podeExcluir =
-    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
-    frete !== undefined &&
-    !['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') && frete !== undefined
 
   const podeEditar =
-    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
-    frete !== undefined &&
-    !['CONCLUIDA', 'CANCELADO'].includes(frete.status)
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') && frete !== undefined
+
+  const statusSensivelExclusao =
+    frete !== undefined && ['EM_VIAGEM', 'CONCLUIDA'].includes(frete.status)
+
+  const statusSensivelEdicao =
+    frete !== undefined && ['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
 
   const editDefaultValues = frete ? {
     numero_frete: frete.numero_frete,
@@ -529,17 +531,24 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         onConfirm={handleConfirmarExclusao}
         loading={loadingExclusao}
         title="Excluir Frete"
-        description="Esta ação é irreversível. Digite sua senha para confirmar."
+        description={
+          statusSensivelExclusao
+            ? `Atenção: este frete está com status ${frete?.status}. A exclusão é irreversível — confirme com sua senha.`
+            : 'Esta ação é irreversível. Digite sua senha para confirmar.'
+        }
       />
 
-      {/* Item 14: Senha para edição */}
       <PasswordConfirmDialog
         open={senhaEditAberta}
         onOpenChange={setSenhaEditAberta}
         onConfirm={handleConfirmarEdit}
         loading={loadingEditSenha}
         title="Editar Frete"
-        description="Digite sua senha para liberar a edição dos dados do frete."
+        description={
+          statusSensivelEdicao
+            ? `Atenção: este frete está com status ${frete?.status}. Confirme sua senha para liberar a edição.`
+            : 'Digite sua senha para liberar a edição dos dados do frete.'
+        }
       />
 
       {/* Item 14: Modal de edição pré-preenchido */}
