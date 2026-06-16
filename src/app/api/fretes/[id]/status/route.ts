@@ -1,8 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { validarTransicao } from '@/lib/state-machine'
 import { validarChaveNFe } from '@/lib/validations/chave-nfe'
-import { invalidUUID } from '@/lib/api-helpers'
+import { invalidUUID, extractIp } from '@/lib/api-helpers'
 import type { StatusViagem } from '@/lib/state-machine'
+import { z } from 'zod'
+
+const StatusSchema = z.enum([
+  'ABERTO', 'PROGRAMADO', 'CARREGANDO', 'CTE_EMITIDO',
+  'AGUARDANDO_LIBERACAO', 'EM_VIAGEM', 'CONCLUIDA', 'CANCELADO',
+])
 
 export async function PATCH(
   request: Request,
@@ -24,7 +30,9 @@ export async function PATCH(
   }
 
   const body: Record<string, unknown> = await request.json()
-  const novoStatus = body.status as StatusViagem
+  const statusResult = StatusSchema.safeParse(body.status)
+  if (!statusResult.success) return Response.json({ error: 'Status inválido' }, { status: 422 })
+  const novoStatus = statusResult.data as StatusViagem
 
   if (novoStatus === 'CANCELADO' && !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
     return Response.json({ error: 'Apenas ADMIN e SUPERVISOR podem cancelar fretes' }, { status: 403 })
@@ -198,7 +206,7 @@ export async function PATCH(
     status_anterior: frete.status,
     status_novo: novoStatus,
     usuario_id: user.id,
-    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    ip_address: extractIp(request),
     user_agent: request.headers.get('user-agent'),
   })
 

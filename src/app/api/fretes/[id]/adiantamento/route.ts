@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID } from '@/lib/api-helpers'
+import { invalidUUID, extractIp } from '@/lib/api-helpers'
 
 export async function POST(
   request: Request,
@@ -38,7 +38,8 @@ export async function POST(
 
   const agora = new Date().toISOString()
 
-  // Confirma adiantamento E avança status para EM_VIAGEM (ação única)
+  // Confirma adiantamento E avança status para EM_VIAGEM (ação única).
+  // Filtros repetidos no UPDATE evitam dupla confirmação em caso de requisição concorrente.
   const { error: updateError } = await supabase
     .from('fretes')
     .update({
@@ -47,13 +48,15 @@ export async function POST(
       status: 'EM_VIAGEM',
     })
     .eq('id', id)
+    .eq('status', 'AGUARDANDO_LIBERACAO')
+    .is('adiantamento_pago_em', null)
 
   if (updateError) return Response.json({ error: 'Erro interno' }, { status: 500 })
 
-  const ip = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip')
+  const ip = extractIp(request)
   const ua = request.headers.get('user-agent')
 
-  await supabase.from('eventos').insert([
+  const { error: eventoError } = await supabase.from('eventos').insert([
     {
       frete_id: id,
       tipo: 'ADIANTAMENTO_PAGO',
@@ -73,6 +76,7 @@ export async function POST(
       user_agent: ua,
     },
   ])
+  if (eventoError) console.error('[adiantamento] evento insert error', eventoError)
 
   return Response.json({ ok: true, novoStatus: 'EM_VIAGEM' })
 }

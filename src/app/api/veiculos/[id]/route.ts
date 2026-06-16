@@ -35,6 +35,11 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (!perfil || !['ADMIN', 'SUPERVISOR'].includes(perfil.papel)) {
+    return Response.json({ error: 'Permissão insuficiente' }, { status: 403 })
+  }
+
   const body = await request.json()
   const parsed = VeiculoUpdateSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.flatten() }, { status: 422 })

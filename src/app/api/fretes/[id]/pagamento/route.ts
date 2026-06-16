@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID } from '@/lib/api-helpers'
+import { invalidUUID, extractIp } from '@/lib/api-helpers'
 
 export async function POST(
   request: Request,
@@ -34,21 +34,25 @@ export async function POST(
     return Response.json({ error: 'Pagamento já foi confirmado' }, { status: 409 })
   }
 
+  // Filtros repetidos no UPDATE evitam duplo pagamento em caso de requisição concorrente.
   const { error: updateError } = await supabase
     .from('fretes')
     .update({ pago_em: new Date().toISOString(), pago_por: user.id })
     .eq('id', id)
+    .eq('status', 'CONCLUIDA')
+    .is('pago_em', null)
 
   if (updateError) return Response.json({ error: 'Erro interno' }, { status: 500 })
 
-  await supabase.from('eventos').insert({
+  const { error: eventoError } = await supabase.from('eventos').insert({
     frete_id: id,
     tipo: 'PAGAMENTO_CONFIRMADO',
     descricao: `Pagamento do frete ${frete.numero_frete} confirmado`,
     usuario_id: user.id,
-    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    ip_address: extractIp(request),
     user_agent: request.headers.get('user-agent'),
   })
+  if (eventoError) console.error('[pagamento] evento insert error', eventoError)
 
   return Response.json({ ok: true })
 }

@@ -53,6 +53,10 @@ export async function POST(request: Request) {
     return Response.json({ error: parsed.error.flatten() }, { status: 422 })
   }
 
+  if (perfil.papel === 'SUPERVISOR' && parsed.data.papel === 'ADMIN') {
+    return Response.json({ error: 'SUPERVISOR não pode criar usuários ADMIN' }, { status: 403 })
+  }
+
   const admin = createAdminClient()
   const { data: authUser, error: authError } = await admin.auth.admin.createUser({
     email: parsed.data.email,
