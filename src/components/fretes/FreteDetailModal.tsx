@@ -14,7 +14,7 @@ import { FreteFormModal } from '@/components/fretes/FreteFormModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, CheckCircle2 } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, CheckCircle2, Tag } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { Tables, EventoComUsuario } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
@@ -439,6 +439,12 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                         {frete.placa_carreta && ` + Carreta: ${frete.placa_carreta}`}
                         {' — '}{frete.veiculos.tipo}
                       </span>
+                    </div>
+                  )}
+                  {frete.veiculos?.tag && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Tag className="h-4 w-4 shrink-0" />
+                      <span>TAG: {frete.veiculos.tag}</span>
                     </div>
                   )}
                   {(['EM_VIAGEM', 'CONCLUIDA'] as StatusViagem[]).includes(frete.status as StatusViagem) ? (
