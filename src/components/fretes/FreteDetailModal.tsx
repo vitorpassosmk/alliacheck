@@ -424,9 +424,14 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                       : <span className="italic text-muted-foreground/60">—</span>}
                   </div>
                   {frete.motoristas && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="h-4 w-4 shrink-0" />
-                      <span>{frete.motoristas.nome}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="h-4 w-4 shrink-0" />
+                        <span>{frete.motoristas.nome}</span>
+                      </div>
+                      {frete.motoristas.cpf && (
+                        <p className="text-xs text-muted-foreground pl-6">CPF: {frete.motoristas.cpf}</p>
+                      )}
                     </div>
                   )}
                   {frete.veiculos && (
