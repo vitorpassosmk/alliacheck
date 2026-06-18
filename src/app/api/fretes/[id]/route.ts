@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { invalidUUID } from '@/lib/api-helpers'
+import { validarChaveNFe } from '@/lib/validations/chave-nfe'
 import { z } from 'zod'
 
 export async function DELETE(
@@ -61,10 +62,18 @@ const FreteUpdateSchema = z.object({
   valor_frete: z.number().positive().nullable().optional(),
   valor_mercadoria: z.number().positive().nullable().optional(),
   custo_agregado: z.number().positive().nullable().optional(),
+  valor_adiantamento: z.number().positive().nullable().optional(),
   data_carregamento: z.string().nullable().optional(),
   data_entrega_prevista: z.string().nullable().optional(),
   data_entrega_real: z.string().nullable().optional(),
   observacoes: z.string().nullable().optional(),
+  placa_carreta: z.string().max(8).nullable().optional(),
+  placa_cavalo: z.string().max(8).nullable().optional(),
+  motorista_e_funcionario_agregado: z.boolean().optional(),
+  numero_gr: z.string().min(1).nullable().optional(),
+  chave_cte: z.string().length(44).nullable().optional(),
+  numero_contrato: z.string().nullable().optional(),
+  numero_ciot: z.string().nullable().optional(),
 })
 
 export async function GET(
@@ -118,7 +127,7 @@ export async function PATCH(
 
   const { data: freteAtual } = await supabase
     .from('fretes')
-    .select('status, numero_frete, excluido_em, origem_cidade, origem_uf, destino_cidade, destino_uf, cliente_id, motorista_id, veiculo_id, tipo_veiculo, tipo_produto, valor_frete, valor_mercadoria, custo_agregado, data_carregamento, data_entrega_prevista, data_entrega_real, observacoes')
+    .select('status, numero_frete, excluido_em, origem_cidade, origem_uf, destino_cidade, destino_uf, cliente_id, motorista_id, veiculo_id, tipo_veiculo, tipo_produto, valor_frete, valor_mercadoria, custo_agregado, valor_adiantamento, data_carregamento, data_entrega_prevista, data_entrega_real, observacoes, placa_carreta, placa_cavalo, motorista_e_funcionario_agregado, numero_gr, chave_cte, numero_contrato, numero_ciot')
     .eq('id', id)
     .single()
 
@@ -130,6 +139,10 @@ export async function PATCH(
   const parsed = FreteUpdateSchema.safeParse(body)
   if (!parsed.success) {
     return Response.json({ error: parsed.error.flatten() }, { status: 422 })
+  }
+
+  if (parsed.data.chave_cte != null && !validarChaveNFe(parsed.data.chave_cte)) {
+    return Response.json({ error: 'Chave CT-e inválida (44 dígitos, dígito verificador módulo 11)' }, { status: 422 })
   }
 
   const camposAlterados = (Object.keys(parsed.data) as (keyof typeof parsed.data)[])
