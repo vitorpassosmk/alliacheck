@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     authUserId = authUser.user.id
   }
 
-  const { data, error } = await supabase.from('users').insert({
+  const { data, error } = await admin.from('users').insert({
     id: authUserId,
     nome: parsed.data.nome,
     papel: parsed.data.papel,
