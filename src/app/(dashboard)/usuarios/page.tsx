@@ -10,13 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Plus, UserPlus, Shield, Eye, Wrench, Pencil, EyeOff } from 'lucide-react'
+import { UserPlus, Shield, Eye, Wrench, Pencil, EyeOff, Trash2, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Papel = 'ADMIN' | 'SUPERVISOR' | 'CONFERENTE'
@@ -70,6 +70,12 @@ export default function UsuariosPage() {
   const [editAtivo, setEditAtivo] = useState(true)
   const [mostrarSenha, setMostrarSenha] = useState(false)
   const [papelLogado, setPapelLogado] = useState<Papel | null>(null)
+  const [idLogado, setIdLogado] = useState<string | null>(null)
+
+  // exclusão
+  const [excluindoUsuario, setExcluindoUsuario] = useState<Usuario | null>(null)
+  const [senhaExclusao, setSenhaExclusao] = useState('')
+  const [excluindoPending, setExcluindoPending] = useState(false)
 
   const queryClient = useQueryClient()
   const supabase = createClient()
@@ -78,6 +84,7 @@ export default function UsuariosPage() {
     const fetchPapel = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setIdLogado(user.id)
       const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
       if (data) setPapelLogado(data.papel as Papel)
     }
@@ -176,6 +183,47 @@ export default function UsuariosPage() {
     return false
   }
 
+  function podeExcluir(usuario: Usuario): boolean {
+    return papelLogado === 'ADMIN' && usuario.id !== idLogado
+  }
+
+  async function confirmarExclusao() {
+    if (!excluindoUsuario || !senhaExclusao) return
+    setExcluindoPending(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) {
+      toast.error('Sessão expirada. Faça login novamente.')
+      setExcluindoPending(false)
+      return
+    }
+
+    const { error: authErr } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: senhaExclusao,
+    })
+
+    if (authErr) {
+      toast.error('Senha incorreta')
+      setExcluindoPending(false)
+      return
+    }
+
+    const res = await fetch(`/api/usuarios/${excluindoUsuario.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const err = await res.json()
+      toast.error(err.error ?? 'Erro ao excluir usuário')
+      setExcluindoPending(false)
+      return
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+    toast.success(`Usuário "${excluindoUsuario.nome}" excluído com sucesso`)
+    setExcluindoUsuario(null)
+    setSenhaExclusao('')
+    setExcluindoPending(false)
+  }
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
@@ -211,7 +259,7 @@ export default function UsuariosPage() {
               <TableHead>Telefone</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Cadastrado em</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -245,17 +293,30 @@ export default function UsuariosPage() {
                     {formatDate(usuario.criado_em)}
                   </TableCell>
                   <TableCell>
-                    {podeEditar(usuario) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => abrirEdicao(usuario)}
-                        title="Editar usuário"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {podeEditar(usuario) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => abrirEdicao(usuario)}
+                          title="Editar usuário"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {podeExcluir(usuario) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => { setExcluindoUsuario(usuario); setSenhaExclusao('') }}
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -348,6 +409,57 @@ export default function UsuariosPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Excluir Usuário */}
+      <Dialog
+        open={!!excluindoUsuario}
+        onOpenChange={(open) => { if (!open) { setExcluindoUsuario(null); setSenhaExclusao('') } }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir usuário
+            </DialogTitle>
+            <DialogDescription>
+              Esta ação é permanente e não pode ser desfeita. O usuário será removido do sistema e poderá ser recadastrado com o mesmo e-mail no futuro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <p className="font-medium">{excluindoUsuario?.nome}</p>
+              <p className="text-muted-foreground">{excluindoUsuario?.email}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="senha-exclusao">Confirme sua senha para continuar</Label>
+              <Input
+                id="senha-exclusao"
+                type="password"
+                value={senhaExclusao}
+                onChange={(e) => setSenhaExclusao(e.target.value)}
+                placeholder="Sua senha de acesso"
+                onKeyDown={(e) => { if (e.key === 'Enter' && senhaExclusao) confirmarExclusao() }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setExcluindoUsuario(null); setSenhaExclusao('') }}
+              disabled={excluindoPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarExclusao}
+              disabled={!senhaExclusao || excluindoPending}
+            >
+              {excluindoPending ? 'Excluindo...' : 'Excluir permanentemente'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

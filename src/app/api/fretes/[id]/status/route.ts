@@ -40,7 +40,7 @@ export async function PATCH(
 
   const { data: frete } = await supabase
     .from('fretes')
-    .select('status, numero_frete, data_carregamento, valor_adiantamento, data_entrega_prevista, custo_agregado')
+    .select('status, numero_frete, data_carregamento, valor_adiantamento, data_entrega_prevista, custo_agregado, motorista_id, veiculo_id')
     .eq('id', id)
     .is('excluido_em', null)
     .single()
@@ -165,23 +165,35 @@ export async function PATCH(
   }
 
   if (novoStatus === 'AGUARDANDO_LIBERACAO') {
+    // Frota não emite contrato e não recebe adiantamento — apenas CT-e e CIOT
+    const [{ data: motoristaDados }, { data: veiculoDados }] = await Promise.all([
+      frete.motorista_id
+        ? supabase.from('motoristas').select('tipo_motorista').eq('id', frete.motorista_id).single()
+        : Promise.resolve({ data: null, error: null }),
+      frete.veiculo_id
+        ? supabase.from('veiculos').select('tipo_veiculo').eq('id', frete.veiculo_id).single()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+    const ambosFretas = motoristaDados?.tipo_motorista === 'FROTA' && veiculoDados?.tipo_veiculo === 'FROTA'
+
     const numero_contrato = (body.numero_contrato as string | undefined)?.trim()
     const numero_ciot = (body.numero_ciot as string | undefined)?.trim()
     const valor_adiantamento = body.valor_adiantamento as number | undefined
-    if (!numero_contrato) {
+
+    if (!ambosFretas && !numero_contrato) {
       return Response.json({ error: 'N° do contrato é obrigatório' }, { status: 422 })
     }
     if (!numero_ciot) {
       return Response.json({ error: 'N° CIOT é obrigatório' }, { status: 422 })
     }
-    // valor_adiantamento obrigatório, mas aceita o valor já registrado no frete
     const adiantamentoFinal = valor_adiantamento ?? frete.valor_adiantamento
-    if (!adiantamentoFinal || adiantamentoFinal <= 0) {
+    if (!ambosFretas && (!adiantamentoFinal || adiantamentoFinal <= 0)) {
       return Response.json({ error: 'Valor de adiantamento é obrigatório e deve ser maior que zero' }, { status: 422 })
     }
-    camposAdicionais.numero_contrato = numero_contrato
+
+    if (numero_contrato) camposAdicionais.numero_contrato = numero_contrato
     camposAdicionais.numero_ciot = numero_ciot
-    camposAdicionais.valor_adiantamento = adiantamentoFinal
+    if (adiantamentoFinal && adiantamentoFinal > 0) camposAdicionais.valor_adiantamento = adiantamentoFinal
   }
 
   if (novoStatus === 'CONCLUIDA') {

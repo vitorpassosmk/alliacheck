@@ -1,8 +1,47 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { invalidUUID } from '@/lib/api-helpers'
 import { z } from 'zod'
 
 const ROLES_GERENTES = ['ADMIN', 'SUPERVISOR'] as const
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const uuidErr = invalidUUID(id)
+  if (uuidErr) return uuidErr
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (perfil?.papel !== 'ADMIN') {
+    return Response.json({ error: 'Apenas ADMIN pode excluir usuários' }, { status: 403 })
+  }
+
+  if (user.id === id) {
+    return Response.json({ error: 'Você não pode excluir sua própria conta' }, { status: 403 })
+  }
+
+  const admin = createAdminClient()
+
+  const { data: alvo } = await admin.from('users').select('nome, papel').eq('id', id).single()
+  if (!alvo) return Response.json({ error: 'Usuário não encontrado' }, { status: 404 })
+
+  const { error: dbError } = await admin.from('users').delete().eq('id', id)
+  if (dbError) return Response.json({ error: dbError.message }, { status: 500 })
+
+  const { error: authError } = await admin.auth.admin.deleteUser(id)
+  if (authError) {
+    // auth deletion failed but public profile is gone — log and continue
+    console.error('[usuarios/delete] auth.admin.deleteUser error', authError.message)
+  }
+
+  return Response.json({ ok: true })
+}
 
 const UpdateSchema = z.object({
   papel: z.enum(['ADMIN', 'SUPERVISOR', 'CONFERENTE']).optional(),

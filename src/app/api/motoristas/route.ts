@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { validarCPF } from '@/lib/validations/cpf'
 
 const MotoristaSchema = z.object({
   nome: z.string().min(1),
-  cpf: z.string().min(11),
+  cpf: z.string().refine((v) => validarCPF(v), { message: 'CPF inválido' }),
   cnh: z.string().min(1),
   validade_cnh: z.string().min(1),
   telefone: z.string().nullable().optional(),

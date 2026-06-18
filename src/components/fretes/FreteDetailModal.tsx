@@ -245,6 +245,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     : []
   const nextStatus = proximos[0] as StatusViagem | undefined
 
+  const ambosFretas =
+    frete?.motoristas?.tipo_motorista === 'FROTA' &&
+    frete?.veiculos?.tipo_veiculo === 'FROTA'
+
   // Item 5: SUPERVISOR também pode cancelar
   const podeCancelar =
     ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
@@ -372,6 +376,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setValorAdiantamento={setValorAdiantamento}
                     dataDescarga={dataDescarga}
                     setDataDescarga={setDataDescarga}
+                    ambosFretas={ambosFretas}
                   />
                   {/* Item 5: SUPERVISOR também pode cancelar */}
                   {podeCancelar && !cancelando && (
@@ -624,6 +629,7 @@ interface TransitionFormProps {
   setValorAdiantamento: (v: string) => void
   dataDescarga: string
   setDataDescarga: (v: string) => void
+  ambosFretas: boolean
 }
 
 function TransitionForm({
@@ -643,6 +649,7 @@ function TransitionForm({
   numeroContrato, setNumeroContrato, numeroCiot, setNumeroCiot,
   valorAdiantamento, setValorAdiantamento,
   dataDescarga, setDataDescarga,
+  ambosFretas,
 }: TransitionFormProps) {
   if (!nextStatus) return null
 
@@ -902,33 +909,41 @@ function TransitionForm({
   if (status === 'CTE_EMITIDO') {
     return (
       <div className="space-y-3">
-        <p className="text-sm font-medium">Preencha os dados contratuais para aguardar liberação financeira</p>
+        <p className="text-sm font-medium">Preencha os dados para aguardar liberação financeira</p>
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">N° Contrato *</label>
-            <Input value={numeroContrato} onChange={e => setNumeroContrato(e.target.value)} placeholder="Ex: 2024-001" />
-          </div>
-          <div className="space-y-1">
+          {!ambosFretas && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">N° Contrato *</label>
+              <Input value={numeroContrato} onChange={e => setNumeroContrato(e.target.value)} placeholder="Ex: 2024-001" />
+            </div>
+          )}
+          <div className={`space-y-1${ambosFretas ? ' col-span-2' : ''}`}>
             <label className="text-xs text-muted-foreground">N° CIOT *</label>
             <Input value={numeroCiot} onChange={e => setNumeroCiot(e.target.value)} placeholder="N° CIOT" />
           </div>
-          <div className="space-y-1 col-span-2">
-            <label className="text-xs text-muted-foreground">Valor de Adiantamento (R$) *</label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={valorAdiantamento}
-              onChange={e => setValorAdiantamento(e.target.value)}
-              placeholder="0,00"
-              className="max-w-xs"
-            />
-          </div>
+          {!ambosFretas && (
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs text-muted-foreground">Valor de Adiantamento (R$) *</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={valorAdiantamento}
+                onChange={e => setValorAdiantamento(e.target.value)}
+                placeholder="0,00"
+                className="max-w-xs"
+              />
+            </div>
+          )}
         </div>
         <Button
           size="sm"
           onClick={() => onAvancar('AGUARDANDO_LIBERACAO')}
-          disabled={!numeroContrato.trim() || !numeroCiot.trim() || !valorAdiantamento || isPending}
+          disabled={
+            (!ambosFretas && (!numeroContrato.trim() || !valorAdiantamento)) ||
+            !numeroCiot.trim() ||
+            isPending
+          }
         >
           Registrar e Aguardar Liberação
         </Button>
@@ -939,7 +954,11 @@ function TransitionForm({
   if (status === 'AGUARDANDO_LIBERACAO') {
     return (
       <p className="text-sm text-muted-foreground">
-        Realize o checklist abaixo. Após concluído, acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.
+        Realize o checklist abaixo. Após concluído,{' '}
+        {ambosFretas
+          ? <>utilize o botão <strong>Liberar Viagem</strong> abaixo para iniciar a viagem.</>
+          : <>acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.</>
+        }
       </p>
     )
   }
@@ -983,6 +1002,27 @@ function LiberacaoPanel({
   papel: string | null
 }) {
   const queryClient = useQueryClient()
+  const ambosFretas = frete.motoristas?.tipo_motorista === 'FROTA' && frete.veiculos?.tipo_veiculo === 'FROTA'
+  const [liberandoFrota, setLiberandoFrota] = useState(false)
+
+  async function handleLiberarFrota() {
+    setLiberandoFrota(true)
+    try {
+      const res = await fetch(`/api/fretes/${freteId}/adiantamento`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        toast.error(body.error ?? 'Erro ao liberar viagem.')
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
+      queryClient.invalidateQueries({ queryKey: ['fretes'] })
+      toast.success('Viagem liberada com sucesso!')
+    } catch {
+      toast.error('Erro ao liberar viagem.')
+    } finally {
+      setLiberandoFrota(false)
+    }
+  }
 
   const { data: checklistData, isLoading: loadingChecklist } = useQuery({
     queryKey: ['checklist', freteId],
@@ -1067,11 +1107,27 @@ function LiberacaoPanel({
       )}
 
       {todosMarcados && (
-        <div className="border border-green-200 bg-green-50 rounded-md p-3 text-sm text-green-800 flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>
-            Checklist concluído. Acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.
-          </span>
+        <div className="space-y-2">
+          <div className="border border-green-200 bg-green-50 rounded-md p-3 text-sm text-green-800 flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              Checklist concluído.{' '}
+              {ambosFretas
+                ? 'Clique em "Liberar Viagem" para iniciar a viagem.'
+                : <>Acesse <strong>Pagamentos</strong> para confirmar o adiantamento e liberar a viagem.</>
+              }
+            </span>
+          </div>
+          {ambosFretas && ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') && (
+            <Button
+              size="sm"
+              className="w-full"
+              onClick={handleLiberarFrota}
+              disabled={liberandoFrota}
+            >
+              {liberandoFrota ? 'Liberando...' : 'Liberar Viagem'}
+            </Button>
+          )}
         </div>
       )}
 
@@ -1098,6 +1154,8 @@ function LiberacaoPanel({
             <p className="text-lg font-semibold text-amber-900">
               R$ {frete.valor_adiantamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
+          ) : ambosFretas ? (
+            <p className="text-sm text-muted-foreground italic">Sem adiantamento (Frota)</p>
           ) : (
             <p className="text-muted-foreground italic">Não informado</p>
           )}

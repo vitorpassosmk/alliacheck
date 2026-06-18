@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { validarCPF } from '@/lib/validations/cpf'
+import { validarCNPJ } from '@/lib/validations/cnpj'
 
 const TIPOS_VEICULO = ['VAN', 'TOCO', 'TRUCK', 'BITRUCK', 'CARRETA', 'CARRETA_LS', 'BITREM'] as const
 
@@ -12,8 +14,14 @@ const VeiculoSchema = z.object({
   tipo_veiculo: z.enum(['FROTA', 'AGREGADO']).nullable().optional(),
   tem_placas_separadas: z.boolean().optional(),
   placa_carreta: z.string().nullable().optional(),
-  cpf_proprietario: z.string().nullable().optional(),
-  cnpj_proprietario: z.string().nullable().optional(),
+  cpf_proprietario: z.string().nullable().optional().refine(
+    (v) => !v || validarCPF(v),
+    { message: 'CPF do proprietário inválido' }
+  ),
+  cnpj_proprietario: z.string().nullable().optional().refine(
+    (v) => !v || validarCNPJ(v),
+    { message: 'CNPJ do proprietário inválido' }
+  ),
   banco_proprietario: z.string().nullable().optional(),
   agencia_conta_proprietario: z.string().nullable().optional(),
   chave_pix_proprietario: z.string().nullable().optional(),
