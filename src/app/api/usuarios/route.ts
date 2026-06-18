@@ -64,10 +64,44 @@ export async function POST(request: Request) {
     email_confirm: true,
   })
 
-  if (authError) return Response.json({ error: authError.message }, { status: 500 })
+  let authUserId: string
+
+  if (authError) {
+    const isDuplicate =
+      authError.message.toLowerCase().includes('already') ||
+      (authError as { status?: number }).status === 422
+
+    if (!isDuplicate) {
+      return Response.json({ error: authError.message }, { status: 500 })
+    }
+
+    // Email já existe no auth — verificar se há perfil na tabela pública
+    const { data: allAuthUsers } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    const existing = allAuthUsers?.users.find((u: User) => u.email === parsed.data.email)
+
+    if (!existing) {
+      return Response.json({ error: 'Este email já está cadastrado no sistema.' }, { status: 422 })
+    }
+
+    const { data: existingProfile } = await admin
+      .from('users')
+      .select('id')
+      .eq('id', existing.id)
+      .maybeSingle()
+
+    if (existingProfile) {
+      return Response.json({ error: 'Este email já está cadastrado no sistema.' }, { status: 422 })
+    }
+
+    // Usuário órfão (auth existe mas sem perfil) — atualizar senha e reaproveitar
+    await admin.auth.admin.updateUserById(existing.id, { password: parsed.data.senha })
+    authUserId = existing.id
+  } else {
+    authUserId = authUser.user.id
+  }
 
   const { data, error } = await supabase.from('users').insert({
-    id: authUser.user.id,
+    id: authUserId,
     nome: parsed.data.nome,
     papel: parsed.data.papel,
     telefone: parsed.data.telefone ?? null,
