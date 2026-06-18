@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { EventTimeline } from '@/components/eventos/EventTimeline'
 import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog'
-import { FreteFormModal } from '@/components/fretes/FreteFormModal'
+import { FreteCorrecaoModal } from '@/components/fretes/FreteCorrecaoModal'
 import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -266,23 +266,6 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
   const statusSensivelEdicao =
     frete !== undefined && ['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
-
-  const editDefaultValues = frete ? {
-    numero_frete: frete.numero_frete,
-    origem_cidade: frete.origem_cidade,
-    origem_uf: frete.origem_uf,
-    destino_cidade: frete.destino_cidade,
-    destino_uf: frete.destino_uf,
-    cliente_id: frete.cliente_id ?? undefined,
-    tipo_veiculo: frete.tipo_veiculo ?? undefined,
-    tipo_produto: frete.tipo_produto ?? undefined,
-    valor_mercadoria: frete.valor_mercadoria?.toString() ?? '',
-    valor_frete: frete.valor_frete?.toString() ?? '',
-    custo_agregado: frete.custo_agregado?.toString() ?? '',
-    data_carregamento: frete.data_carregamento ?? '',
-    data_entrega_prevista: frete.data_entrega_prevista ?? undefined,
-    observacoes: frete.observacoes ?? undefined,
-  } : undefined
 
   return (
     <>
@@ -567,16 +550,15 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         }
       />
 
-      {/* Item 14: Modal de edição pré-preenchido */}
-      {editAberto && (
-        <FreteFormModal
+      {editAberto && frete && (
+        <FreteCorrecaoModal
           open={editAberto}
           onClose={() => {
             setEditAberto(false)
             queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
           }}
           freteId={freteId}
-          defaultValues={editDefaultValues}
+          frete={frete}
         />
       )}
     </>
