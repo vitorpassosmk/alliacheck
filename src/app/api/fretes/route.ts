@@ -29,7 +29,7 @@ export async function GET() {
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix, cpf),
+      motoristas(nome, cnh, validade_cnh, banco, agencia_conta, chave_pix, cpf, telefone, whatsapp),
       veiculos(placa, tipo, placa_carreta, proprietario, cpf_proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .is('excluido_em', null)

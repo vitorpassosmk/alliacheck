@@ -424,6 +424,9 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                       {frete.motoristas.cpf && (
                         <p className="text-xs text-muted-foreground pl-6">CPF: {frete.motoristas.cpf}</p>
                       )}
+                      {(frete.motoristas.whatsapp ?? frete.motoristas.telefone) && (
+                        <p className="text-xs text-muted-foreground pl-6">Whatsapp: {frete.motoristas.whatsapp ?? frete.motoristas.telefone}</p>
+                      )}
                     </div>
                   )}
                   {frete.veiculos && (

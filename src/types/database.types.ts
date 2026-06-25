@@ -132,6 +132,7 @@ export type Database = {
           banco: string | null
           agencia_conta: string | null
           chave_pix: string | null
+          whatsapp: string | null
           criado_em: string
         }
         Insert: {
@@ -148,6 +149,7 @@ export type Database = {
           banco?: string | null
           agencia_conta?: string | null
           chave_pix?: string | null
+          whatsapp?: string | null
           criado_em?: string
         }
         Update: {
@@ -164,6 +166,7 @@ export type Database = {
           banco?: string | null
           agencia_conta?: string | null
           chave_pix?: string | null
+          whatsapp?: string | null
           criado_em?: string
         }
         Relationships: []

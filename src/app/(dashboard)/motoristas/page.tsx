@@ -24,6 +24,7 @@ const MotoristaSchema = z.object({
   cnh: z.string().min(1, 'Obrigatório'),
   validade_cnh: z.string().min(1, 'Obrigatório'),
   telefone: z.string().optional(),
+  whatsapp: z.string().optional(),
   tipo_motorista: z.enum(['FROTA', 'AGREGADO']).nullable().optional(),
   banco: z.string().optional(),
   agencia_conta: z.string().optional(),
@@ -55,7 +56,7 @@ export default function MotoristasPage() {
   const form = useForm<MotoristaForm>({
     resolver: zodResolver(MotoristaSchema),
     defaultValues: {
-      nome: '', cpf: '', cnh: '', validade_cnh: '', telefone: '',
+      nome: '', cpf: '', cnh: '', validade_cnh: '', telefone: '', whatsapp: '',
       tipo_motorista: null, banco: '', agencia_conta: '', chave_pix: '',
     },
   })
@@ -86,6 +87,7 @@ export default function MotoristasPage() {
       cnh: m.cnh,
       validade_cnh: m.validade_cnh,
       telefone: m.telefone ?? '',
+      whatsapp: m.whatsapp ?? '',
       tipo_motorista: m.tipo_motorista ?? null,
       banco: m.banco ?? '',
       agencia_conta: m.agencia_conta ?? '',
@@ -133,6 +135,7 @@ export default function MotoristasPage() {
                       Venc. {new Date(m.validade_cnh + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </span>
                     {m.telefone && <><span>·</span><span>{m.telefone}</span></>}
+                    {m.whatsapp && <><span>·</span><span>WA: {m.whatsapp}</span></>}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -167,6 +170,9 @@ export default function MotoristasPage() {
                 )} />
                 <FormField control={form.control} name="telefone" render={({ field }) => (
                   <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input placeholder="(11) 99999-0000" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="whatsapp" render={({ field }) => (
+                  <FormItem><FormLabel>WhatsApp</FormLabel><FormControl><Input placeholder="(11) 99999-0000" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="cnh" render={({ field }) => (
                   <FormItem><FormLabel>CNH *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

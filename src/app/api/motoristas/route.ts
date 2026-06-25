@@ -13,6 +13,7 @@ const MotoristaSchema = z.object({
   banco: z.string().nullable().optional(),
   agencia_conta: z.string().nullable().optional(),
   chave_pix: z.string().nullable().optional(),
+  whatsapp: z.string().nullable().optional(),
 })
 
 export async function GET() {

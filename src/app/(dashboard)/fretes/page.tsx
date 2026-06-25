@@ -210,8 +210,8 @@ export default function FretesPage() {
                   <TableCell>
                     <StatusBadge status={frete.status} />
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {frete.chave_cte ? frete.chave_cte.slice(-8) : '—'}
+                  <TableCell className="font-mono text-xs text-muted-foreground max-w-[160px] truncate" title={frete.chave_cte ?? undefined}>
+                    {frete.chave_cte ?? '—'}
                   </TableCell>
                   <TableCell>{formatDate(frete.data_carregamento)}</TableCell>
                   <TableCell>{formatDate(frete.data_entrega_prevista)}</TableCell>
