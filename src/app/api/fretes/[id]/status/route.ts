@@ -143,6 +143,10 @@ export async function PATCH(
     if (motorista_e_funcionario_agregado !== undefined) {
       camposAdicionais.motorista_e_funcionario_agregado = !!motorista_e_funcionario_agregado
     }
+
+    // observacoes: campo livre de observações sobre o frete ou pagamento
+    const observacoes_prog = (body.observacoes as string | undefined)?.trim().slice(0, 1000)
+    if (observacoes_prog) camposAdicionais.observacoes = observacoes_prog
   }
 
   if (novoStatus === 'CARREGANDO') {

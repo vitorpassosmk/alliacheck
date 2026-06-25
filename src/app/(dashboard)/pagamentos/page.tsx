@@ -27,7 +27,7 @@ async function fetchAdiantamentosPendentes(): Promise<FreteComRelacoes[]> {
       *,
       clientes(razao_social),
       motoristas(nome, banco, agencia_conta, chave_pix, cpf),
-      veiculos(placa, tipo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .eq('status', 'AGUARDANDO_LIBERACAO')
     .is('adiantamento_pago_em', null)
@@ -46,7 +46,7 @@ async function fetchPagamentosFinalPendentes(): Promise<FreteComRelacoes[]> {
       *,
       clientes(razao_social),
       motoristas(nome, banco, agencia_conta, chave_pix, cpf),
-      veiculos(placa, tipo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
     `)
     .eq('status', 'CONCLUIDA')
     .is('pago_em', null)
@@ -261,7 +261,7 @@ export default function PagamentosPage() {
 function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const isFrota = v?.tipo_veiculo === 'FROTA'
   const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   function BlocoItem({ label, nome, banco, conta, pix, variant = 'green' }: {
@@ -300,22 +300,21 @@ function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
     )
   }
 
-  if (motoristaEProprietario) {
+  if (isFrota) {
     return (
-      <BlocoItem
-        label="Motorista / Proprietário"
-        nome={m?.nome}
-        banco={m?.banco}
-        conta={m?.agencia_conta}
-        pix={m?.chave_pix}
-      />
+      <div className="border rounded-lg p-4 space-y-2 bg-blue-50 border-blue-200">
+        <p className="text-xs font-medium uppercase tracking-wide text-blue-800">Veículo de Frota</p>
+        <p className="text-sm text-muted-foreground">
+          Motorista empregado — remuneração via folha de pagamento. Não há pagamento externo a realizar.
+        </p>
+      </div>
     )
   }
 
   return (
     <div className="space-y-3">
       <BlocoItem
-        label={`Proprietário do Veículo${v?.proprietario ? ` — ${v.proprietario}` : ''}`}
+        label="Proprietário do Veículo"
         nome={v?.proprietario ?? v?.placa}
         banco={v?.banco_proprietario}
         conta={v?.agencia_conta_proprietario}
@@ -423,7 +422,7 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const isFrota = v?.tipo_veiculo === 'FROTA'
   const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   return (
@@ -457,6 +456,17 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
             </div>
           )}
 
+          {(frete.numero_contrato || frete.chave_cte) && (
+            <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+              {frete.numero_contrato && (
+                <span>Contrato: <span className="font-medium text-foreground">{frete.numero_contrato}</span></span>
+              )}
+              {frete.chave_cte && (
+                <span className="font-mono truncate">CT-e: {frete.chave_cte}</span>
+              )}
+            </div>
+          )}
+
           {/* Valor do adiantamento destacado */}
           {frete.valor_adiantamento && (
             <div className="bg-white border border-amber-200 rounded-md p-3">
@@ -472,20 +482,10 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
             </div>
           )}
 
-          {/* Dados bancários — lógica 3 casos */}
-          {motoristaEProprietario ? (
-            m && (m.banco || m.chave_pix) && (
-              <div className="border-t pt-2 space-y-1">
-                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
-                  <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
-                </p>
-                {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
-                {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
-              </div>
-            )
-          ) : (
+          {/* Dados bancários — agregado exibe proprietário do veículo; frota não exibe */}
+          {!isFrota && (
             <div className="border-t pt-2 space-y-2">
-              {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
+              {v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                     <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
@@ -493,6 +493,8 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
                   {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
                   {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">Dados bancários do proprietário não cadastrados</p>
               )}
               {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
                 <div className="space-y-1 pt-1 border-t border-amber-200">
@@ -600,7 +602,7 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
 
   const m = frete.motoristas
   const v = frete.veiculos
-  const motoristaEProprietario = !!(m && v && m.cpf && v.cpf_proprietario && m.cpf === v.cpf_proprietario)
+  const isFrota = v?.tipo_veiculo === 'FROTA'
   const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
   return (
@@ -666,20 +668,10 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
             )}
           </div>
 
-          {/* Dados bancários — lógica 3 casos */}
-          {motoristaEProprietario ? (
-            m && (m.banco || m.chave_pix) ? (
-              <div className="border-t pt-2 space-y-1">
-                <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
-                  <CreditCard className="h-3 w-3" /> Banco — {m.nome} (motorista/proprietário)
-                </p>
-                {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
-                {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
-              </div>
-            ) : null
-          ) : (
+          {/* Dados bancários — agregado exibe proprietário do veículo; frota não exibe */}
+          {!isFrota && (
             <div className="border-t pt-2 space-y-2">
-              {v && (v.banco_proprietario || v.chave_pix_proprietario) && (
+              {v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                     <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
@@ -687,6 +679,8 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
                   {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
                   {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">Dados bancários do proprietário não cadastrados</p>
               )}
               {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
                 <div className="space-y-1 pt-1 border-t border-amber-200">

@@ -61,6 +61,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [placaCarreta, setPlacaCarreta] = useState('')
   const [placaCavalo, setPlacaCavalo] = useState('')
   const [motoristaFuncionarioAgregado, setMotoristaFuncionarioAgregado] = useState(false)
+  const [observacoesProgramado, setObservacoesProgramado] = useState('')
   const [dataCarregamentoForm, setDataCarregamentoForm] = useState('')
   const [dataEntregaPrevistaForm, setDataEntregaPrevistaForm] = useState('')
 
@@ -144,6 +145,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
         body.veiculo_id = veiculoId
         if (!frete?.custo_agregado) body.custo_agregado = parsePositive(custoAgregado)
         if (valorAdiantamentoProgramado) body.valor_adiantamento = parsePositive(valorAdiantamentoProgramado)
+        if (observacoesProgramado.trim()) body.observacoes = observacoesProgramado.trim()
         body.placa_carreta = temPlacasSeparadas ? placaCarreta.trim() || null : null
         body.placa_cavalo = temPlacasSeparadas ? placaCavalo.trim() || null : null
         body.motorista_e_funcionario_agregado = motoristaFuncionarioAgregado
@@ -181,7 +183,7 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
       setNumeroCiot(''); setValorAdiantamento('')
       setCustoAgregado(''); setDataCarregamentoForm(''); setDataEntregaPrevistaForm('')
       setValorAdiantamentoProgramado(''); setTemPlacasSeparadas(false); setPlacaCarreta(''); setPlacaCavalo('')
-      setMotoristaFuncionarioAgregado(false)
+      setMotoristaFuncionarioAgregado(false); setObservacoesProgramado('')
       setDataDescarga('')
       toast.success('Status atualizado')
     },
@@ -340,6 +342,8 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                     setPlacaCavalo={setPlacaCavalo}
                     motoristaFuncionarioAgregado={motoristaFuncionarioAgregado}
                     setMotoristaFuncionarioAgregado={setMotoristaFuncionarioAgregado}
+                    observacoesProgramado={observacoesProgramado}
+                    setObservacoesProgramado={setObservacoesProgramado}
                     dataCarregamentoExistente={frete.data_carregamento}
                     dataCarregamentoForm={dataCarregamentoForm}
                     setDataCarregamentoForm={setDataCarregamentoForm}
@@ -592,6 +596,8 @@ interface TransitionFormProps {
   setPlacaCavalo: (v: string) => void
   motoristaFuncionarioAgregado: boolean
   setMotoristaFuncionarioAgregado: (v: boolean) => void
+  observacoesProgramado: string
+  setObservacoesProgramado: (v: string) => void
   dataCarregamentoExistente: string | null
   dataCarregamentoForm: string
   setDataCarregamentoForm: (v: string) => void
@@ -624,6 +630,7 @@ function TransitionForm({
   placaCarreta, setPlacaCarreta,
   placaCavalo, setPlacaCavalo,
   motoristaFuncionarioAgregado, setMotoristaFuncionarioAgregado,
+  observacoesProgramado, setObservacoesProgramado,
   dataCarregamentoExistente, dataCarregamentoForm, setDataCarregamentoForm,
   dataEntregaPrevistaExistente, dataEntregaPrevistaForm, setDataEntregaPrevistaForm,
   numeroGr, setNumeroGr,
@@ -825,6 +832,20 @@ function TransitionForm({
               onChange={e => setValorAdiantamentoProgramado(e.target.value)}
               placeholder="0,00"
               className="max-w-xs"
+            />
+          </div>
+
+          {/* Observações da programação */}
+          <div className="space-y-1 col-span-2">
+            <label className="text-xs text-muted-foreground">
+              Observações
+            </label>
+            <textarea
+              value={observacoesProgramado}
+              onChange={e => setObservacoesProgramado(e.target.value)}
+              placeholder="Informações relevantes sobre o frete ou pagamento"
+              maxLength={1000}
+              className="w-full text-sm border rounded-md p-2 min-h-[60px] resize-none bg-background"
             />
           </div>
         </div>
