@@ -636,6 +636,17 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
             </div>
           )}
 
+          {(frete.numero_contrato || frete.chave_cte) && (
+            <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+              {frete.numero_contrato && (
+                <span>Contrato: <span className="font-medium text-foreground">{frete.numero_contrato}</span></span>
+              )}
+              {frete.chave_cte && (
+                <span className="font-mono truncate">CT-e: {frete.chave_cte}</span>
+              )}
+            </div>
+          )}
+
           {/* Detalhe financeiro — custo, adiantamento, restante */}
           <div className="bg-gray-50 rounded-md p-3 space-y-2 text-xs">
             {frete.custo_agregado && (
@@ -758,6 +769,17 @@ function FreteCardPago({ frete }: { frete: FreteComRelacoes }) {
           <div className="flex items-center gap-1.5 text-xs text-teal-700 font-medium">
             <CheckCircle2 className="h-3 w-3 shrink-0" />
             <span>Pago em {dataPagamento}</span>
+          </div>
+        )}
+
+        {(frete.numero_contrato || frete.chave_cte) && (
+          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            {frete.numero_contrato && (
+              <span>Contrato: <span className="font-medium text-foreground">{frete.numero_contrato}</span></span>
+            )}
+            {frete.chave_cte && (
+              <span className="font-mono truncate">CT-e: {frete.chave_cte}</span>
+            )}
           </div>
         )}
 

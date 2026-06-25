@@ -1,6 +1,6 @@
 # ALLiA Check — TODO
 
-Última atualização: 2026-06-18 (sessão: exclusão de usuário, validação de CPF, FreteCorrecaoModal, deploy preview)
+Última atualização: 2026-06-25 (sessão 20 — campo Observações na programação ABERTO→PROGRAMADO; ajustes BlocosBancarios para FROTA; migration 015 RLS users; deploy produção commit 15a26e9)
 
 ---
 
