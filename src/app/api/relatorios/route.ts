@@ -5,6 +5,11 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Não autorizado' }, { status: 401 })
 
+  const { data: perfil } = await supabase.from('users').select('papel').eq('id', user.id).single()
+  if (!perfil || perfil.papel === 'CONFERENTE') {
+    return Response.json({ error: 'Apenas ADMINs e SUPERVISORs podem acessar relatórios' }, { status: 403 })
+  }
+
   const url = new URL(request.url)
   const dataInicio = url.searchParams.get('data_inicio')
   const dataFim = url.searchParams.get('data_fim')

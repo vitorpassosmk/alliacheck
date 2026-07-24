@@ -37,7 +37,7 @@ const navItems: NavItem[] = [
   { href: '/veiculos', label: 'Veículos', icon: Truck },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
   { href: '/pagamentos', label: 'Pagamentos', icon: Banknote, somente: ['ADMIN', 'SUPERVISOR'] as Papel[] },
-  { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { href: '/relatorios', label: 'Relatórios', icon: BarChart3, somente: ['ADMIN', 'SUPERVISOR'] as Papel[] },
   { href: '/usuarios', label: 'Usuários', icon: UserCog, somente: ['ADMIN', 'SUPERVISOR'] as Papel[] },
 ]
 

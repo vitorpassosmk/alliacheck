@@ -10,11 +10,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/kanban/StatusBadge'
 import { EventTimeline } from '@/components/eventos/EventTimeline'
 import { PasswordConfirmDialog } from '@/components/common/PasswordConfirmDialog'
+import { WhatsAppLink } from '@/components/common/WhatsAppLink'
 import { FreteCorrecaoModal } from '@/components/fretes/FreteCorrecaoModal'
-import { TRANSICOES_VIAGEM } from '@/lib/state-machine'
+import { TRANSICOES_VIAGEM, TRANSICOES_REVERTER } from '@/lib/state-machine'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, CheckCircle2, Tag } from 'lucide-react'
+import { MapPin, User, Truck, Calendar, AlertTriangle, CreditCard, FileText, Trash2, Pencil, CheckCircle2, Tag, ChevronLeft } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { Tables, EventoComUsuario } from '@/types/database.types'
 import type { StatusViagem } from '@/lib/state-machine'
@@ -88,6 +89,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
   const [senhaEditAberta, setSenhaEditAberta] = useState(false)
   const [loadingEditSenha, setLoadingEditSenha] = useState(false)
   const [editAberto, setEditAberto] = useState(false)
+
+  // Diálogo de senha — retroceder status
+  const [reverterOpen, setReverterOpen] = useState(false)
+  const [reverterLoading, setReverterLoading] = useState(false)
 
   const { data: frete, isLoading, isError } = useQuery<FreteCompleto>({
     queryKey: ['frete', freteId],
@@ -242,6 +247,25 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
     finally { setLoadingEditSenha(false) }
   }
 
+  async function handleConfirmarReverter(senha: string) {
+    setReverterLoading(true)
+    try {
+      const ok = await verificarSenha(senha)
+      if (!ok) { toast.error('Senha incorreta.'); return }
+      const res = await fetch(`/api/fretes/${freteId}/reverter`, { method: 'POST' })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast.error(json.error ?? 'Erro ao retroceder status.')
+        return
+      }
+      toast.success('Etapa retrocedida com sucesso.')
+      setReverterOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['frete', freteId] })
+      queryClient.invalidateQueries({ queryKey: ['fretes'] })
+    } catch { toast.error('Erro ao retroceder status.') }
+    finally { setReverterLoading(false) }
+  }
+
   const proximos = frete
     ? (TRANSICOES_VIAGEM[frete.status as StatusViagem] ?? []).filter(s => s !== 'CANCELADO')
     : []
@@ -268,6 +292,15 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
 
   const statusSensivelEdicao =
     frete !== undefined && ['CONCLUIDA', 'CANCELADO', 'EM_VIAGEM'].includes(frete.status)
+
+  const podeRetroceder =
+    ['ADMIN', 'SUPERVISOR'].includes(papel ?? '') &&
+    frete !== undefined &&
+    !['ABERTO', 'CANCELADO'].includes(frete.status)
+
+  const statusAnteriorCalculado = frete
+    ? TRANSICOES_REVERTER[frete.status as StatusViagem]
+    : undefined
 
   return (
     <>
@@ -380,6 +413,20 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                 </div>
               )}
 
+              {podeRetroceder && statusAnteriorCalculado && (
+                <div className="flex justify-start">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                    onClick={() => setReverterOpen(true)}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                    Retroceder etapa
+                  </Button>
+                </div>
+              )}
+
               {cancelando && (
                 <CancelForm
                   onConfirm={(motivo) => cancelar.mutate(motivo)}
@@ -424,9 +471,10 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
                       {frete.motoristas.cpf && (
                         <p className="text-xs text-muted-foreground pl-6">CPF: {frete.motoristas.cpf}</p>
                       )}
-                      {(frete.motoristas.whatsapp ?? frete.motoristas.telefone) && (
-                        <p className="text-xs text-muted-foreground pl-6">Whatsapp: {frete.motoristas.whatsapp ?? frete.motoristas.telefone}</p>
-                      )}
+                      <WhatsAppLink
+                        numero={frete.motoristas.whatsapp ?? frete.motoristas.telefone}
+                        className="pl-6"
+                      />
                     </div>
                   )}
                   {frete.veiculos && (
@@ -554,6 +602,19 @@ export function FreteDetailModal({ freteId, open, onClose }: FreteDetailModalPro
           statusSensivelEdicao
             ? `Atenção: este frete está com status ${frete?.status}. Confirme sua senha para liberar a edição.`
             : 'Digite sua senha para liberar a edição dos dados do frete.'
+        }
+      />
+
+      <PasswordConfirmDialog
+        open={reverterOpen}
+        onOpenChange={(v) => { if (!reverterLoading) setReverterOpen(v) }}
+        onConfirm={handleConfirmarReverter}
+        loading={reverterLoading}
+        title="Retroceder etapa"
+        description={
+          statusAnteriorCalculado
+            ? `Digite sua senha para retroceder de ${frete?.status} para ${statusAnteriorCalculado}.`
+            : 'Digite sua senha para retroceder o status.'
         }
       />
 

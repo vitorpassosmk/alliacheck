@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID, extractIp } from '@/lib/api-helpers'
+import { invalidUUID, extractIp, hashIp } from '@/lib/api-helpers'
 
 export async function POST(
   request: Request,
@@ -53,7 +53,7 @@ export async function POST(
 
   if (updateError) return Response.json({ error: 'Erro interno' }, { status: 500 })
 
-  const ip = extractIp(request)
+  const ip = hashIp(extractIp(request))
   const ua = request.headers.get('user-agent')
 
   const { error: eventoError } = await supabase.from('eventos').insert([

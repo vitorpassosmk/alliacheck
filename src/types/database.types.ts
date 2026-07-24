@@ -190,6 +190,7 @@ export type Database = {
           banco_proprietario: string | null
           agencia_conta_proprietario: string | null
           chave_pix_proprietario: string | null
+          whatsapp_proprietario: string | null
         }
         Insert: {
           id?: string
@@ -209,6 +210,7 @@ export type Database = {
           banco_proprietario?: string | null
           agencia_conta_proprietario?: string | null
           chave_pix_proprietario?: string | null
+          whatsapp_proprietario?: string | null
         }
         Update: {
           id?: string
@@ -228,6 +230,7 @@ export type Database = {
           banco_proprietario?: string | null
           agencia_conta_proprietario?: string | null
           chave_pix_proprietario?: string | null
+          whatsapp_proprietario?: string | null
         }
         Relationships: []
       }
@@ -465,6 +468,44 @@ export type Database = {
           {
             foreignKeyName: 'eventos_usuario_id_fkey_public'
             columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      exportacoes_arquivo: {
+        Row: {
+          id: string
+          executado_por: string | null
+          executado_em: string
+          quantidade_fretes: number
+          numeros_fretes: string[]
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          executado_por?: string | null
+          executado_em?: string
+          quantidade_fretes: number
+          numeros_fretes: string[]
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          executado_por?: string | null
+          executado_em?: string
+          quantidade_fretes?: number
+          numeros_fretes?: string[]
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'exportacoes_arquivo_executado_por_fkey'
+            columns: ['executado_por']
             isOneToOne: false
             referencedRelation: 'users'
             referencedColumns: ['id']

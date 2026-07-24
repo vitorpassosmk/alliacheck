@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { useClientes } from '@/hooks/use-clientes'
 import { StatusBadge } from '@/components/kanban/StatusBadge'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Download, Filter, TrendingUp, Package, CheckCircle2, XCircle } from 'lucide-react'
+import { Download, Filter, TrendingUp, Package, CheckCircle2, XCircle, ShieldAlert, FileSpreadsheet } from 'lucide-react'
 import type { Tables } from '@/types/database.types'
 import type { FreteComRelacoes } from '@/services/fretes.service'
+import { sanitizarCelula } from '@/lib/export-safety'
 
 type RelatorioResponse = {
   resumo: {
@@ -50,7 +53,7 @@ function exportCsv(fretes: FreteComRelacoes[]) {
     f.data_carregamento ?? '',
     f.valor_frete?.toString() ?? '',
   ])
-  const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n')
+  const csv = [headers, ...rows].map((r) => r.map((c) => `"${sanitizarCelula(c)}"`).join(',')).join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -64,11 +67,23 @@ export default function RelatoriosPage() {
   const hoje = new Date().toISOString().slice(0, 10)
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)
 
+  const [papel, setPapel] = useState<string | null>(null)
+  const [papelCarregado, setPapelCarregado] = useState(false)
   const [dataInicio, setDataInicio] = useState(inicioMes)
   const [dataFim, setDataFim] = useState(hoje)
   const [clienteId, setClienteId] = useState('')
   const [statusViagem, setStatusViagem] = useState('')
   const [filtrosAtivos, setFiltrosAtivos] = useState({ dataInicio: inicioMes, dataFim: hoje, clienteId: '', statusViagem: '' })
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data } = await supabase.from('users').select('papel').eq('id', user.id).single()
+      setPapel(data?.papel ?? null)
+      setPapelCarregado(true)
+    })
+  }, [])
 
   const { data: clientes } = useClientes()
 
@@ -81,10 +96,30 @@ export default function RelatoriosPage() {
   const { data, isLoading } = useQuery<RelatorioResponse>({
     queryKey: ['relatorios', filtrosAtivos],
     queryFn: () => fetch(`/api/relatorios?${params}`).then((r) => r.json()),
+    enabled: papelCarregado && papel !== 'CONFERENTE',
   })
 
   const aplicarFiltros = () => {
     setFiltrosAtivos({ dataInicio, dataFim, clienteId, statusViagem })
+  }
+
+  if (!papelCarregado) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
+
+  if (papel === 'CONFERENTE') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
+        <ShieldAlert className="h-10 w-10" />
+        <p className="text-sm font-medium">Acesso restrito</p>
+        <p className="text-xs">Apenas ADMINs e SUPERVISORs podem acessar os Relatórios.</p>
+      </div>
+    )
   }
 
   return (
@@ -94,12 +129,20 @@ export default function RelatoriosPage() {
           <h1 className="text-xl font-semibold">Relatórios</h1>
           <p className="text-sm text-muted-foreground">Análise de fretes por período e filtros</p>
         </div>
-        {data && data.fretes.length > 0 && (
-          <Button variant="outline" onClick={() => exportCsv(data.fretes)}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar CSV
+        <div className="flex items-center gap-2">
+          {data && data.fretes.length > 0 && (
+            <Button variant="outline" onClick={() => exportCsv(data.fretes)}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          )}
+          <Button variant="outline" asChild>
+            <Link href="/relatorios/exportar-fretes">
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Exportar e Liberar Espaço
+            </Link>
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Filtros */}

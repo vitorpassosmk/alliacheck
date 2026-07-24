@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID, extractIp } from '@/lib/api-helpers'
+import { invalidUUID, extractIp, hashIp } from '@/lib/api-helpers'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -76,7 +76,7 @@ export async function POST(
     tipo: 'CHECKLIST_ITEM',
     descricao: marcado ? 'Item de checklist marcado' : 'Item de checklist desmarcado',
     usuario_id: user.id,
-    ip_address: extractIp(request),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
   if (eventoError) console.error('[checklist] evento insert error', eventoError)

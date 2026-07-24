@@ -1,3 +1,5 @@
+import { createHmac } from 'crypto'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Returns an error Response if `id` is not a valid UUID, null otherwise. */
@@ -15,4 +17,18 @@ export function invalidUUID(id: string): Response | null {
 export function extractIp(request: Request): string | null {
   const forwarded = request.headers.get('x-forwarded-for')
   return forwarded?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip')
+}
+
+/**
+ * Hash do IP para gravar em `eventos` sem armazenar o IP em texto puro (LGPD).
+ * Usa HMAC-SHA256 com a service role key como chave: um SHA-256 simples seria
+ * reversível por força bruta (o espaço de IPv4 é pequeno o suficiente para testar
+ * todos os valores em minutos), então a chave secreta é o que torna o hash
+ * inviável de reverter. Mesma entrada sempre gera o mesmo hash, preservando a
+ * capacidade de correlacionar eventos da mesma origem.
+ */
+export function hashIp(ip: string | null): string | null {
+  if (!ip) return null
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+  return createHmac('sha256', secret).update(ip).digest('hex')
 }

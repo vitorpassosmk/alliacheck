@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { validarTransicao } from '@/lib/state-machine'
 import { validarChaveNFe } from '@/lib/validations/chave-nfe'
-import { invalidUUID, extractIp } from '@/lib/api-helpers'
+import { invalidUUID, extractIp, hashIp } from '@/lib/api-helpers'
 import type { StatusViagem } from '@/lib/state-machine'
 import { z } from 'zod'
 
@@ -233,7 +233,7 @@ export async function PATCH(
     status_anterior: frete.status,
     status_novo: novoStatus,
     usuario_id: user.id,
-    ip_address: extractIp(request),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
 

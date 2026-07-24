@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { extractIp, hashIp } from '@/lib/api-helpers'
 import { z } from 'zod'
 
 const FreteCreateSchema = z.object({
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
     descricao: `Frete ${data.numero_frete} criado`,
     status_novo: 'ABERTO',
     usuario_id: user.id,
-    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
 

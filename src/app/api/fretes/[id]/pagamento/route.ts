@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID, extractIp } from '@/lib/api-helpers'
+import { invalidUUID, extractIp, hashIp } from '@/lib/api-helpers'
 
 export async function POST(
   request: Request,
@@ -49,7 +49,7 @@ export async function POST(
     tipo: 'PAGAMENTO_CONFIRMADO',
     descricao: `Pagamento do frete ${frete.numero_frete} confirmado`,
     usuario_id: user.id,
-    ip_address: extractIp(request),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
   if (eventoError) console.error('[pagamento] evento insert error', eventoError)

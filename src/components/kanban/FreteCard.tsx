@@ -5,6 +5,7 @@ import { MapPin, Calendar, Package, DollarSign, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StatusViagem } from '@/lib/state-machine'
 import type { FreteComRelacoes } from '@/services/fretes.service'
+import { WhatsAppLink } from '@/components/common/WhatsAppLink'
 
 interface FreteCardProps {
   frete: FreteComRelacoes
@@ -29,6 +30,16 @@ function DataLabel({ frete }: { frete: FreteComRelacoes }) {
   const label = mostrarEntrega ? 'Prev. entrega:' : 'Carregamento:'
 
   if (!data) return null
+
+  if (mostrarEntrega) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs font-bold text-red-600 animate-blink">
+        <Calendar className="h-3 w-3 shrink-0" />
+        <span>{label} {new Date(data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Calendar className="h-3 w-3 shrink-0" />
@@ -133,9 +144,10 @@ function FreteCardLiberacao({ frete, onClick }: FreteCardProps) {
         {frete.motoristas?.cpf && (
           <p className="text-xs text-muted-foreground pl-4 truncate">CPF: {frete.motoristas.cpf}</p>
         )}
-        {(frete.motoristas?.whatsapp ?? frete.motoristas?.telefone) && (
-          <p className="text-xs text-muted-foreground pl-4 truncate">Whatsapp: {frete.motoristas.whatsapp ?? frete.motoristas.telefone}</p>
-        )}
+        <WhatsAppLink
+          numero={frete.motoristas?.whatsapp ?? frete.motoristas?.telefone}
+          className="pl-4 truncate"
+        />
         <DataLabel frete={frete} />
         {frete.valor_mercadoria && (
           <div className="flex items-center gap-1 text-xs font-medium text-emerald-700">
@@ -188,9 +200,10 @@ function FreteCardCompacto({ frete, onClick }: FreteCardProps) {
         {frete.motoristas?.cpf && (
           <p className="text-xs text-muted-foreground pl-4 truncate">CPF: {frete.motoristas.cpf}</p>
         )}
-        {(frete.motoristas?.whatsapp ?? frete.motoristas?.telefone) && (
-          <p className="text-xs text-muted-foreground pl-4 truncate">Whatsapp: {frete.motoristas.whatsapp ?? frete.motoristas.telefone}</p>
-        )}
+        <WhatsAppLink
+          numero={frete.motoristas?.whatsapp ?? frete.motoristas?.telefone}
+          className="pl-4 truncate"
+        />
 
         <DataLabel frete={frete} />
 

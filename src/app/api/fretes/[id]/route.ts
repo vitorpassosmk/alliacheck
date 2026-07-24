@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { invalidUUID } from '@/lib/api-helpers'
+import { invalidUUID, extractIp, hashIp } from '@/lib/api-helpers'
 import { validarChaveNFe } from '@/lib/validations/chave-nfe'
 import { z } from 'zod'
 
@@ -41,7 +41,7 @@ export async function DELETE(
     tipo: 'FRETE_EXCLUIDO',
     descricao: `Frete ${frete.numero_frete} (status: ${frete.status}) excluído por ${perfil?.papel ?? 'DESCONHECIDO'}`,
     usuario_id: user.id,
-    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
 
@@ -171,7 +171,7 @@ export async function PATCH(
       ? `Campos editados (status: ${freteAtual.status}): ${camposAlterados.join(', ')}`
       : `Dados do frete editados (status: ${freteAtual.status}) — sem alterações detectadas`,
     usuario_id: user.id,
-    ip_address: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'),
+    ip_address: hashIp(extractIp(request)),
     user_agent: request.headers.get('user-agent'),
   })
 

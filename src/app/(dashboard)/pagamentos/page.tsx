@@ -14,6 +14,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MapPin, Calendar, CreditCard, CheckCircle2, Truck } from 'lucide-react'
 import type { FreteComRelacoes } from '@/services/fretes.service'
+import { temDadosBancarios } from '@/lib/dados-bancarios'
+import { WhatsAppLink } from '@/components/common/WhatsAppLink'
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -26,12 +28,13 @@ async function fetchAdiantamentosPendentes(): Promise<FreteComRelacoes[]> {
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, banco, agencia_conta, chave_pix, cpf),
-      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      motoristas(nome, banco, agencia_conta, chave_pix, cpf, telefone, whatsapp),
+      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario, whatsapp_proprietario)
     `)
     .eq('status', 'AGUARDANDO_LIBERACAO')
     .is('adiantamento_pago_em', null)
     .not('valor_adiantamento', 'is', null)
+    .is('excluido_em', null)
     .order('atualizado_em', { ascending: false })
 
   if (error) throw error
@@ -45,11 +48,12 @@ async function fetchPagamentosFinalPendentes(): Promise<FreteComRelacoes[]> {
     .select(`
       *,
       clientes(razao_social),
-      motoristas(nome, banco, agencia_conta, chave_pix, cpf),
-      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario)
+      motoristas(nome, banco, agencia_conta, chave_pix, cpf, telefone, whatsapp),
+      veiculos(placa, tipo, tipo_veiculo, cpf_proprietario, proprietario, banco_proprietario, agencia_conta_proprietario, chave_pix_proprietario, whatsapp_proprietario)
     `)
     .eq('status', 'CONCLUIDA')
     .is('pago_em', null)
+    .is('excluido_em', null)
     .order('atualizado_em', { ascending: false })
 
   if (error) throw error
@@ -68,6 +72,7 @@ async function fetchPagos(): Promise<FreteComRelacoes[]> {
     `)
     .eq('status', 'CONCLUIDA')
     .not('pago_em', 'is', null)
+    .is('excluido_em', null)
     .order('pago_em', { ascending: false })
     .limit(50)
 
@@ -264,9 +269,9 @@ function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
   const isFrota = v?.tipo_veiculo === 'FROTA'
   const funcionarioAgregado = !!frete.motorista_e_funcionario_agregado
 
-  function BlocoItem({ label, nome, banco, conta, pix, variant = 'green' }: {
+  function BlocoItem({ label, nome, banco, conta, pix, whatsapp, variant = 'green' }: {
     label: string; nome?: string | null; banco?: string | null
-    conta?: string | null; pix?: string | null; variant?: 'green' | 'amber'
+    conta?: string | null; pix?: string | null; whatsapp?: string | null; variant?: 'green' | 'amber'
   }) {
     const bg = variant === 'green' ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
     const titleColor = variant === 'green' ? 'text-green-800' : 'text-amber-800'
@@ -274,12 +279,14 @@ function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
       <div className={`border rounded-lg p-4 space-y-3 ${bg}`}>
         <p className={`text-xs font-medium uppercase tracking-wide ${titleColor}`}>{label}</p>
         {nome && <p className="font-semibold text-base">{nome}</p>}
-        {banco ? (
+        {temDadosBancarios({ banco, agenciaConta: conta, pix }) ? (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Banco</span>
-              <span className="font-medium">{banco}</span>
-            </div>
+            {banco && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Banco</span>
+                <span className="font-medium">{banco}</span>
+              </div>
+            )}
             {conta && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Agência / Conta</span>
@@ -296,6 +303,7 @@ function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
             <p className="font-mono text-sm break-all">{pix}</p>
           </div>
         )}
+        <WhatsAppLink numero={whatsapp} label="WhatsApp" />
       </div>
     )
   }
@@ -319,14 +327,16 @@ function BlocosBancarios({ frete }: { frete: FreteComRelacoes }) {
         banco={v?.banco_proprietario}
         conta={v?.agencia_conta_proprietario}
         pix={v?.chave_pix_proprietario}
+        whatsapp={v?.whatsapp_proprietario}
       />
-      {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+      {funcionarioAgregado && m && (temDadosBancarios({ banco: m.banco, agenciaConta: m.agencia_conta, pix: m.chave_pix }) || m.whatsapp || m.telefone) && (
         <BlocoItem
           label="Motorista (funcionário agregado)"
           nome={m.nome}
           banco={m.banco}
           conta={m.agencia_conta}
           pix={m.chave_pix}
+          whatsapp={m.whatsapp ?? m.telefone}
           variant="amber"
         />
       )}
@@ -485,25 +495,33 @@ function FreteCardAdiantamento({ frete, onCardClick }: { frete: FreteComRelacoes
           {/* Dados bancários — agregado exibe proprietário do veículo; frota não exibe */}
           {!isFrota && (
             <div className="border-t pt-2 space-y-2">
-              {v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
+              {v && temDadosBancarios({ banco: v.banco_proprietario, agenciaConta: v.agencia_conta_proprietario, pix: v.chave_pix_proprietario }) ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                     <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
                   </p>
-                  {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
+                  {(v.banco_proprietario || v.agencia_conta_proprietario) && (
+                    <p className="text-xs">{[v.banco_proprietario, v.agencia_conta_proprietario].filter(Boolean).join(' · ')}</p>
+                  )}
                   {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground italic">Dados bancários do proprietário não cadastrados</p>
               )}
-              {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+              <WhatsAppLink numero={v?.whatsapp_proprietario} label="WhatsApp Proprietário" />
+              {funcionarioAgregado && m && temDadosBancarios({ banco: m.banco, agenciaConta: m.agencia_conta, pix: m.chave_pix }) && (
                 <div className="space-y-1 pt-1 border-t border-amber-200">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-amber-800">
                     <CreditCard className="h-3 w-3" /> Motorista (funcionário agregado)
                   </p>
-                  {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                  {(m.banco || m.agencia_conta) && (
+                    <p className="text-xs">{[m.banco, m.agencia_conta].filter(Boolean).join(' · ')}</p>
+                  )}
                   {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
                 </div>
+              )}
+              {funcionarioAgregado && (
+                <WhatsAppLink numero={m?.whatsapp ?? m?.telefone} label="WhatsApp Motorista" />
               )}
             </div>
           )}
@@ -682,25 +700,33 @@ function FreteCardPagamentoFinal({ frete, onCardClick }: { frete: FreteComRelaco
           {/* Dados bancários — agregado exibe proprietário do veículo; frota não exibe */}
           {!isFrota && (
             <div className="border-t pt-2 space-y-2">
-              {v && (v.banco_proprietario || v.chave_pix_proprietario) ? (
+              {v && temDadosBancarios({ banco: v.banco_proprietario, agenciaConta: v.agencia_conta_proprietario, pix: v.chave_pix_proprietario }) ? (
                 <div className="space-y-1">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-green-800">
                     <CreditCard className="h-3 w-3" /> Proprietário ({v.proprietario ?? v.placa})
                   </p>
-                  {v.banco_proprietario && <p className="text-xs">{v.banco_proprietario} · {v.agencia_conta_proprietario}</p>}
+                  {(v.banco_proprietario || v.agencia_conta_proprietario) && (
+                    <p className="text-xs">{[v.banco_proprietario, v.agencia_conta_proprietario].filter(Boolean).join(' · ')}</p>
+                  )}
                   {v.chave_pix_proprietario && <p className="text-xs text-muted-foreground">PIX: {v.chave_pix_proprietario}</p>}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground italic">Dados bancários do proprietário não cadastrados</p>
               )}
-              {funcionarioAgregado && m && (m.banco || m.chave_pix) && (
+              <WhatsAppLink numero={v?.whatsapp_proprietario} label="WhatsApp Proprietário" />
+              {funcionarioAgregado && m && temDadosBancarios({ banco: m.banco, agenciaConta: m.agencia_conta, pix: m.chave_pix }) && (
                 <div className="space-y-1 pt-1 border-t border-amber-200">
                   <p className="text-xs font-medium flex items-center gap-1.5 text-amber-800">
                     <CreditCard className="h-3 w-3" /> Motorista (funcionário agregado)
                   </p>
-                  {m.banco && <p className="text-xs">{m.banco} · {m.agencia_conta}</p>}
+                  {(m.banco || m.agencia_conta) && (
+                    <p className="text-xs">{[m.banco, m.agencia_conta].filter(Boolean).join(' · ')}</p>
+                  )}
                   {m.chave_pix && <p className="text-xs text-muted-foreground">PIX: {m.chave_pix}</p>}
                 </div>
+              )}
+              {funcionarioAgregado && (
+                <WhatsAppLink numero={m?.whatsapp ?? m?.telefone} label="WhatsApp Motorista" />
               )}
             </div>
           )}
