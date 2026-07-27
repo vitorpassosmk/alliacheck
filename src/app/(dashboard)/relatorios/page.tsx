@@ -30,6 +30,8 @@ type RelatorioResponse = {
   fretes: FreteComRelacoes[]
 }
 
+const FILTRO_TODOS = '__todos__'
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
 }
@@ -158,12 +160,15 @@ export default function RelatoriosPage() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Cliente</Label>
-            <Select value={clienteId} onValueChange={(v) => setClienteId(v ?? '')}>
+            <Select
+              value={clienteId || FILTRO_TODOS}
+              onValueChange={(v) => setClienteId(v === FILTRO_TODOS ? '' : v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os clientes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value={FILTRO_TODOS}>Todos</SelectItem>
                 {clientes?.map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.razao_social}</SelectItem>
                 ))}
@@ -172,12 +177,15 @@ export default function RelatoriosPage() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Status</Label>
-            <Select value={statusViagem} onValueChange={(v) => setStatusViagem(v ?? '')}>
+            <Select
+              value={statusViagem || FILTRO_TODOS}
+              onValueChange={(v) => setStatusViagem(v === FILTRO_TODOS ? '' : v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value={FILTRO_TODOS}>Todos</SelectItem>
                 <SelectItem value="ABERTO">Aberto</SelectItem>
                 <SelectItem value="PROGRAMADO">Programado</SelectItem>
                 <SelectItem value="CARREGANDO">Carregando</SelectItem>
